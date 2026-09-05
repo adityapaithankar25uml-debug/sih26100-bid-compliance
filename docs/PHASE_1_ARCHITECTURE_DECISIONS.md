@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-005  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -20,17 +20,17 @@
 ## ADR Index
 
 - [ADR-001: Modular Monolith Architecture Pattern](#adr-001-modular-monolith-architecture-pattern)
-- [ADR-002: Python (FastAPI) Application Backend](#adr-002-python-fastapi-application-backend)
-- [ADR-003: Next.js / React Web Presentation Framework](#adr-003-nextjs--react-web-presentation-framework)
-- [ADR-004: PostgreSQL Primary Relational Database](#adr-004-postgresql-primary-relational-database)
-- [ADR-005: Redis Caching & Async Job Coordination](#adr-005-redis-caching--async-job-coordination)
-- [ADR-006: S3-Compatible Object Storage for Documents](#adr-006-s3-compatible-object-storage-for-documents)
-- [ADR-007: Provider-Agnostic AI Abstraction Layer](#adr-007-provider-agnostic-ai-abstraction-layer)
-- [ADR-008: Government Integration Adapter Pattern](#adr-008-government-integration-adapter-pattern)
-- [ADR-009: Deterministic Python / Pydantic Rule Engine](#adr-009-deterministic-python--pydantic-rule-engine)
-- [ADR-010: Evidence-First Compliance & Provenance Architecture](#adr-010-evidence-first-compliance--provenance-architecture)
-- [ADR-011: Mandatory Human-in-the-Loop Decision Authority](#adr-011-mandatory-human-in-the-loop-decision-authority)
-- [ADR-012: Configurable LIVE / SANDBOX / MOCK / MANUAL Modes](#adr-012-configurable-live--sandbox--mock--manual-modes)
+- [ADR-002: Python (FastAPI) Backend Framework](#adr-002-python-fastapi-backend-framework)
+- [ADR-003: Next.js Presentation Framework](#adr-003-nextjs-presentation-framework)
+- [ADR-004: Primary Relational Database Engine (PostgreSQL + JSONB + pgvector)](#adr-004-primary-relational-database-engine-postgresql--jsonb--pgvector)
+- [ADR-005: S3-Compatible Object Storage for Documents (MinIO)](#adr-005-s3-compatible-object-storage-for-documents-minio)
+- [ADR-006: Provider-Agnostic AI Abstraction Layer](#adr-006-provider-agnostic-ai-abstraction-layer)
+- [ADR-007: Government Integration Adapter Pattern (4 Runtime Modes)](#adr-007-government-integration-adapter-pattern-4-runtime-modes)
+- [ADR-008: Deterministic Python / Pydantic Rule Engine](#adr-008-deterministic-python--pydantic-rule-engine)
+- [ADR-009: Tamper-Evident SHA-256 Hash-Chained Audit Ledger](#adr-009-tamper-evident-sha-256-hash-chained-audit-ledger)
+- [ADR-010: Separation of Compliance Status, Qualification Outcome, Evidence Confidence, and Risk Scoring](#adr-010-separation-of-compliance-status-qualification-outcome-evidence-confidence-and-risk-scoring)
+- [ADR-011: Mandatory Human-in-the-Loop Procurement Officer Decision Authority](#adr-011-mandatory-human-in-the-loop-procurement-officer-decision-authority)
+- [ADR-012: Background Task Execution & Queue Technology (Celery + Redis)](#adr-012-background-task-execution--queue-technology-celery--redis)
 
 ---
 
@@ -48,7 +48,7 @@
 
 ---
 
-### ADR-002: Python (FastAPI) Application Backend
+### ADR-002: Python (FastAPI) Backend Framework
 
 * **Context:** The backend framework must orchestrate AI OCR/NLP models, execute deterministic Pydantic rule validation, handle async government verification calls, and generate RESTful OpenAPI specifications.
 * **Options Considered:**
@@ -63,7 +63,7 @@
 
 ---
 
-### ADR-003: Next.js / React Web Presentation Framework
+### ADR-003: Next.js Presentation Framework
 
 * **Context:** The procurement workbench requires interactive split-screen document evaluation, real-time status updates, side-by-side PDF previewing with bounding-box highlights, and clean officer workflows.
 * **Options Considered:**
@@ -77,35 +77,26 @@
 
 ---
 
-### ADR-004: PostgreSQL Primary Relational Database
+### ADR-004: Primary Relational Database Engine (PostgreSQL + JSONB + pgvector)
 
-* **Context:** The database must handle structured domain entities (Tenders, Bidders, Requirements), support complex relational queries, enforce ACID transaction integrity for officer decisions, and store semi-structured JSON payloads.
+* **Context:** The database must store transactional relational domain entities (Tenders, Bidders, Requirements), handle complex relational queries, enforce ACID transaction integrity for officer decisions, store flexible metadata, and support optional vector embeddings for RAG retrieval.
 * **Options Considered:**
-  1. PostgreSQL.
-  2. MongoDB.
-  3. MySQL.
-* **Decision:** Select **PostgreSQL 16**.
-* **Reason:** PostgreSQL provides ACID compliance for legal decision auditability combined with powerful native `JSONB` document storage for OCR token coordinates and raw government API response payloads.
-* **Consequences:** Database schema must be version-controlled via migrations (in Phase 2).
-* **Rejected Alternatives:** MongoDB (rejected due to weaker relational join capabilities for multi-cover tender requirements and compliance matrices).
+  1. PostgreSQL 16+ (Relational + JSONB + pgvector).
+  2. PostgreSQL with PostGIS extension.
+  3. MongoDB.
+  4. MySQL.
+* **Decision:** Select **PostgreSQL 16+** configured with:
+  - **Relational tables** for transactional data integrity (Tenders, Bidders, Officer Decisions, Requirements).
+  - **`JSONB`** for controlled flexible metadata, dynamic OCR token coordinates, and rule execution traces.
+  - **`pgvector`** extension *only where explicitly justified* for future semantic search or RAG vector retrieval requirements.
+  - **Exclusion of PostGIS:** PostGIS is explicitly **removed** from the mandatory MVP architecture because no documented functional requirement mandates spatial or geographic queries.
+* **Reason:** PostgreSQL provides ACID compliance for legal decision auditability combined with powerful native `JSONB` document storage. Excluding PostGIS reduces unnecessary database dependency overhead while preserving full relational and vector capability.
+* **Consequences:** Database schema must be version-controlled via migrations in Phase 2.
+* **Rejected Alternatives:** PostGIS (rejected as unnecessary for MVP functional requirements); MongoDB (rejected due to weaker relational join capabilities for multi-cover tender requirements).
 
 ---
 
-### ADR-005: Redis Caching & Async Job Coordination
-
-* **Context:** Government verification calls (where active) and AI OCR extraction tasks can be time-consuming. We require caching and asynchronous task queue management.
-* **Options Considered:**
-  1. Redis (Cache + ARQ / Celery Queue).
-  2. RabbitMQ + Memcached.
-  3. In-memory Python Dict.
-* **Decision:** Select **Redis 7**.
-* **Reason:** Redis serves dual roles as a high-speed verification result cache with configurable TTL and a lightweight message broker for asynchronous background document processing jobs.
-* **Consequences:** Requires Redis container in deployment stack.
-* **Rejected Alternatives:** In-memory Python dict (rejected due to process restart data loss and lack of multi-worker shared state).
-
----
-
-### ADR-006: S3-Compatible Object Storage for Documents
+### ADR-005: S3-Compatible Object Storage for Documents (MinIO)
 
 * **Context:** Bidders upload multi-megabyte PDF, JPEG, and TIFF documents. We require scalable, secure document storage separated from the relational database.
 * **Options Considered:**
@@ -119,9 +110,9 @@
 
 ---
 
-### ADR-007: Provider-Agnostic AI Abstraction Layer
+### ADR-006: Provider-Agnostic AI Abstraction Layer
 
-* **Context:** The platform relies on LLM capabilities for document classification, OCR field extraction, and natural language explanation generation. We must prevent vendor lock-in to a single AI provider.
+* **Context:** The platform relies on LLM capabilities for document classification, OCR field extraction assistance, and natural language explanation generation. We must prevent vendor lock-in to a single AI provider.
 * **Options Considered:**
   1. Direct integration with Google Gemini API only.
   2. Direct integration with OpenAI API only.
@@ -133,21 +124,21 @@
 
 ---
 
-### ADR-008: Government Integration Adapter Pattern
+### ADR-007: Government Integration Adapter Pattern (4 Runtime Modes)
 
 * **Context:** Government portals (GST, MCA, Udyam, EPFO, ESIC, etc.) have varying API availability, authentication rules, and access restrictions.
 * **Options Considered:**
   1. Direct API calls scattered throughout backend business logic.
-  2. Centralized Adapter Pattern enforcing `BaseGovernmentAdapter` interface.
+  2. Centralized Adapter Pattern enforcing `BaseGovernmentAdapter` interface with 4 modes (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL`).
   3. Web Scraping scripts for non-API portals.
-* **Decision:** Adopt the **Government Integration Adapter Pattern**.
-* **Reason:** Encapsulates external integration quirks behind a uniform contract. Completely isolates application logic from changes in government endpoints or third-party KYB APIs.
+* **Decision:** Adopt the **Government Integration Adapter Pattern** supporting four runtime modes (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL`).
+* **Reason:** Encapsulates external integration quirks behind a uniform contract. Completely isolates application logic from changes in government endpoints or third-party KYB APIs while visually tagging provenance on UI cards (`[LIVE_VERIFIED]`, `[MOCK_SIMULATED]`, etc.).
 * **Consequences:** Every government integration must be wrapped in an adapter class implementing standard response methods.
 * **Rejected Alternatives:** Web Scraping (rejected due to WAFs, CAPTCHAs, legal ToS violations, and extreme fragility).
 
 ---
 
-### ADR-009: Deterministic Python / Pydantic Rule Engine
+### ADR-008: Deterministic Python / Pydantic Rule Engine
 
 * **Context:** Compliance rules (turnover thresholds, experience years, Make in India local content percentages, MSE EMD waivers) must be evaluated accurately and reproducibly.
 * **Options Considered:**
@@ -161,17 +152,36 @@
 
 ---
 
-### ADR-010: Evidence-First Compliance & Provenance Architecture
+### ADR-009: Tamper-Evident SHA-256 Hash-Chained Audit Ledger
 
-* **Context:** Procurement officers and CVC/CAG auditors require defensible proof for every evaluation result. Checkbox compliance without evidence is unacceptable.
+* **Context:** Procurement decisions, AI extraction events, verification calls, and human officer overrides require legally defensible and vigilance-compliant auditability.
 * **Options Considered:**
-  1. Store evaluation result flags only (`PASS` / `FAIL`).
-  2. Store evaluation result flags with text summary notes.
-  3. Evidence-First Architecture: Bind every result to an immutable evidence record citing exact PDF page, bounding box, API payload, and hash.
-* **Decision:** Adopt **Evidence-First Architecture**.
-* **Reason:** Creates complete provenance transparency. Clicking any compliance flag in the UI immediately renders the highlighted source document bounding box or raw API payload, eliminating black-box distrust.
-* **Consequences:** Requires bounding-box coordinate extraction during OCR processing and evidence link storage in database.
-* **Rejected Alternatives:** Result-only flags (rejected due to audit vulnerability and inability to defend decisions during appeals).
+  1. Standard relational database audit log table with timestamps.
+  2. Tamper-evident append-only ledger using SHA-256 cryptographic hash chaining (`Hash_n = SHA256(Hash_{n-1} + Timestamp + Actor + Payload)`).
+  3. Claims of absolute "tamper-proof" database storage.
+* **Decision:** Implement a **Tamper-Evident SHA-256 Hash-Chained Audit Ledger**.
+* **Terminology & Technical Rationale:** We explicitly adopt the technically accurate term **"tamper-evident audit trail"** (rather than "tamper-proof"). Cryptographic hash chaining ensures that any modification, insertion, or deletion of past audit records immediately invalidates all subsequent block hashes, providing undeniable mathematical evidence of tampering to auditors. However, hash chaining alone does not mathematically guarantee that a privileged database administrator with full write access cannot rewrite the entire historical ledger from scratch; true tamper-resistance requires backing the chain with external write-once-read-many (WORM) storage or external timestamping services.
+* **Consequences:** Every audit event must calculate and store its cryptographic hash based on the preceding record hash.
+* **Rejected Alternatives:** Absolute "tamper-proof" claims (rejected as technically inaccurate for single-database deployments); unchained audit logs (rejected due to lack of tamper detection).
+
+---
+
+### ADR-010: Separation of Compliance Status, Qualification Outcome, Evidence Confidence, and Risk Scoring
+
+* **Context:** Evaluating bidders requires distinct analytical metrics without conflating binary pass/fail compliance, overall qualification, evidence quality, and risk indicators.
+* **Options Considered:**
+  1. Single percentage score combining compliance and risk.
+  2. Mandatory rule: "Any mandatory requirement FAIL forces Risk Score = 100".
+  3. Four strictly separated analytical dimensions: (A) Compliance Status, (B) Compliance/Qualification Outcome, (C) Evidence Confidence, (D) Risk Score.
+* **Decision:** Adopt **Strict Four-Dimensional Separation**:
+  - **A. Compliance Status:** Itemized status for individual requirements (`PASS`, `FAIL`, `REVIEW`, `MISSING`, `EXPIRED`, `CONFLICT`, `NOT_VERIFIED`, `NOT_APPLICABLE`).
+  - **B. Compliance / Qualification Outcome:** Overall bidder evaluation outcome (`COMPLIANT`, `NOT COMPLIANT`, `PROVISIONAL`). A mandatory requirement failure produces `Compliance Status = FAIL` and/or `Qualification Outcome = NOT COMPLIANT`.
+  - **C. Evidence Confidence:** Metric (0.0–1.0 or `HIGH`/`MEDIUM`/`LOW`/`UNVERIFIED`) rating document OCR quality and API verification source authority.
+  - **D. Risk Score:** Independent analytical score (0.0–100.0) measuring anomaly indicators, conflicting information across sources, verification failures, suspicious document patterns, document irregularities, and historical/vendor risk indicators.
+* **Non-Interference Mandate:** Risk Score is a separate analytical dimension. A mandatory requirement failure sets `Compliance Status = FAIL` and `Qualification Outcome = NOT COMPLIANT`, but DOES NOT automatically force `Risk Score = 100`. Risk score itself CANNOT independently qualify or disqualify a bidder.
+* **Decision Authority:** The Human Procurement Officer remains the final decision authority.
+* **Consequences:** Data structures and UI dashboards must render these four dimensions independently.
+* **Rejected Alternatives:** Automatic disqualification by risk score (rejected because qualification must be rule-driven and human-approved); conflating risk score with compliance pass/fail (rejected as structurally flawed).
 
 ---
 
@@ -189,14 +199,15 @@
 
 ---
 
-### ADR-012: Configurable LIVE / SANDBOX / MOCK / MANUAL Modes
+### ADR-012: Background Task Execution & Queue Technology (Celery + Redis)
 
-* **Context:** Live government APIs require formal government authorization, MoUs, and GSP partnerships that cannot be completed within an SIH hackathon timeline.
+* **Context:** Asynchronous background processing is required for heavy tasks such as multi-page PDF OCR extraction, document layout parsing, background API verification calls, and async notification delivery.
 * **Options Considered:**
-  1. Refuse to demonstrate features where live APIs are unavailable.
-  2. Fake live API calls by hardcoding responses inside UI components.
-  3. Implement 4 runtime modes (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL`) in backend adapters with explicit visual UI tags.
-* **Decision:** Implement **Configurable 4-Runtime Adapter Modes (`LIVE` / `SANDBOX` / `MOCK` / `MANUAL`)**.
-* **Reason:** Demonstrates production-grade engineering while maintaining 100% technical honesty during hackathon presentations.
-* **Consequences:** UI must render clear visual indicators (`[LIVE_VERIFIED]`, `[MOCK_SIMULATED]`, `[MANUAL_VERIFIED]`) on all data elements.
-* **Rejected Alternatives:** Hardcoded UI faking (rejected as dishonest and unarchitected).
+  1. Celery + Redis.
+  2. ARQ + Redis.
+  3. Synchronous request-response processing inside FastAPI handlers.
+* **Decision:** Select **Celery + Redis** as the single background task execution stack for the MVP.
+* **Role of Redis:** Redis 7+ serves as the central message broker, task queue, background-job coordinator, and ephemeral result/session cache with configurable TTL.
+* **Role of Celery:** Celery manages background worker processes, task routing, retries with exponential backoff, and task monitoring.
+* **Consequences:** Celery worker processes must be managed alongside the main FastAPI application.
+* **Rejected Alternatives:** ARQ (rejected as a secondary alternative to maintain a single, mature background processing stack); synchronous in-request processing (rejected due to HTTP request timeout risks during multi-page PDF processing).

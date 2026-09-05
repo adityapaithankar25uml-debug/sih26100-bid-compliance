@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-004  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -39,7 +39,7 @@ flowchart TD
         C2["Document Intelligence & OCR"]
         C3["Deterministic Rule Engine"]
         C4["Make in India Policy Engine"]
-        C5["3D Risk & Scoring Engine"]
+        C5["Risk Engine & 4D Analytics"]
     end
 
     subgraph GW ["Integration Gateway"]
@@ -54,10 +54,10 @@ flowchart TD
     end
 
     subgraph DATA ["Storage & Evidence Layer"]
-        F1[("PostgreSQL DB")]
+        F1[("PostgreSQL DB (JSONB + pgvector)")]
         F2[("MinIO Object Storage")]
-        F3[("Redis Cache")]
-        F4["Immutable Audit Log (SHA-256 Chain)"]
+        F3[("Redis Task Queue (Celery) & Cache")]
+        F4["Tamper-Evident Audit Log (SHA-256 Chain)"]
     end
 
     A1 -->|REST API| B1
@@ -163,7 +163,7 @@ flowchart TD
 
 ---
 
-## Flow E: Deterministic Compliance Evaluation Flow
+## Flow E: Deterministic Compliance Evaluation & Analytical Risk Flow
 
 ```mermaid
 flowchart TD
@@ -181,27 +181,34 @@ flowchart TD
         B5["Debarment & Blacklist Match Check"]
     end
 
-    subgraph STATUS ["Status Assignment Matrix"]
-        C1{"All Criteria Satisfied?"}
-        C2["Status: PASS"]
-        C3{"Mandatory Failure?"}
-        C4["Status: FAIL (Escalate Risk = 100)"]
-        C5["Status: REVIEW / MISSING / CONFLICT"]
+    subgraph COMPLIANCE ["Compliance Evaluation"]
+        C1{"All Mandatory Criteria Satisfied?"}
+        C2["Compliance Status: PASS"]
+        C3["Compliance Status: FAIL"]
+        C4["Outcome: COMPLIANT"]
+        C5["Outcome: NOT COMPLIANT"]
     end
 
-    subgraph OUTPUT ["3D Score Computation"]
-        D1["Compliance Score (0-100)"]
-        D2["Evidence Confidence (0-100)"]
-        D3["Risk Score (0-100)"]
+    subgraph RISK ["Independent Risk Analysis Engine"]
+        R1["Evaluate Anomaly Indicators & Document Irregularities"]
+        R2["Evaluate Data Conflicts across Documents/APIs"]
+        R3["Evaluate External Verification Failure Signals"]
+        R4["Compute Independent Analytical Risk Score (0.0 - 100.0)"]
+    end
+
+    subgraph OUTPUT ["Four Separate Analytical Outputs"]
+        D1["1. Compliance Status (PASS / FAIL / REVIEW)"]
+        D2["2. Qualification Outcome (COMPLIANT / NOT COMPLIANT)"]
+        D3["3. Evidence Confidence (0.0 - 1.0)"]
+        D4["4. Risk Score (0.0 - 100.0)"]
     end
 
     INPUT --> EXEC
     B1 & B2 & B3 & B4 & B5 --> C1
-    C1 -->|Yes| C2
-    C1 -->|No| C3
-    C3 -->|Yes| C4
-    C3 -->|No| C5
-    C2 & C4 & C5 --> OUTPUT
+    C1 -->|Yes| C2 --> C4
+    C1 -->|No| C3 --> C5
+    EXEC --> R1 & R2 & R3 --> R4
+    C2 & C3 & C4 & C5 & R4 --> D1 & D2 & D3 & D4
 ```
 
 ---
@@ -215,7 +222,7 @@ sequenceDiagram
     participant EvLedger as Evidence Ledger Module
     participant DocIntel as Document Intelligence
     participant GW as Verification Gateway
-    participant Audit as Audit Logger
+    participant Audit as Tamper-Evident Audit Logger
     participant DB as PostgreSQL DB
 
     RuleEng->>EvLedger: Create Evidence Record for Requirement
@@ -225,7 +232,7 @@ sequenceDiagram
     GW-->>EvLedger: Return API Timestamp & Mode Payload
     EvLedger->>EvLedger: Generate SHA-256 Hash of Evidence Payload
     EvLedger->>DB: Store Linked Evidence Record
-    EvLedger->>Audit: Append Evidence Block to Hash Chain
+    EvLedger->>Audit: Append Evidence Block to SHA-256 Hash Chain
     Audit-->>RuleEng: Return Confirmed Evidence Reference ID
 ```
 
@@ -241,7 +248,7 @@ sequenceDiagram
     participant PDF as Split PDF Viewer
     participant API as FastAPI Backend
     participant DecModule as Decision Workflow
-    participant Audit as Audit Trail Logger
+    participant Audit as Tamper-Evident Audit Logger
     participant DB as PostgreSQL DB
 
     Officer->>UI: Inspect Bidder Evaluation Profile

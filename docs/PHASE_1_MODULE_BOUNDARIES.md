@@ -168,23 +168,23 @@ This specification establishes strict architectural boundaries, responsibilities
 
 ## 14. Risk Engine Module
 
-- **Responsibility:** Aggregates evaluation results, conflict alerts, document expiry flags, and debarment matches into a structured Risk Profile.
-- **Inputs:** Compliance Evaluation Results, Conflict Alerts, Debarment Matches.
-- **Outputs:** Aggregated Risk Profile, Non-Linear Escalation Alerts.
+- **Responsibility:** Aggregates anomaly indicators, data conflict alerts, verification failures, suspicious document patterns, document irregularities, and historical/vendor risk indicators into a separate analytical Risk Profile (0.0 to 100.0).
+- **Inputs:** Compliance Evaluation Results, Conflict Alerts, Verification Failure Events, Anomaly Signals.
+- **Outputs:** Aggregated Analytical Risk Profile (0.0–100.0), Risk Breakdown Categories.
 - **Dependencies:** Deterministic Rule Engine, Cross-Source Conflict Detection Module.
 - **Data Ownership:** `risk_profiles` database table.
-- **MUST NOT DO:** MUST NOT collapse multi-dimensional analysis into a single percentage score.
+- **MUST NOT DO:** MUST NOT allow the risk score itself to determine final bidder qualification or disqualification.
 
 ---
 
-## 15. Compliance Scoring Module
+## 15. Compliance Scoring & Evaluation Module
 
-- **Responsibility:** Computes the Three-Dimensional Compliance Metrics: (1) Compliance Score (0–100), (2) Evidence Confidence (0–100), (3) Risk Score (0–100).
-- **Inputs:** Evaluated Requirement Flags, Source Confidence Weights, Severity Matrix.
-- **Outputs:** 3D Score Metric Payload.
+- **Responsibility:** Computes and tracks the Four Separate Analytical Dimensions: (1) Compliance Status per requirement, (2) Qualification Outcome (`COMPLIANT`, `NOT COMPLIANT`), (3) Evidence Confidence (0.0–1.0), (4) Risk Score (0.0–100.0).
+- **Inputs:** Evaluated Requirement Flags, Source Confidence Weights, Risk Profile Data.
+- **Outputs:** 4-Dimensional Metric Payload.
 - **Dependencies:** Deterministic Rule Engine, Risk Engine Module.
 - **Data Ownership:** `scoring_metrics` database table.
-- **MUST NOT DO:** MUST NOT make the compliance score auto-trigger qualification/disqualification.
+- **MUST NOT DO:** MUST NOT allow risk scores or evidence confidence to independently trigger qualification/disqualification.
 
 ---
 
@@ -201,7 +201,7 @@ This specification establishes strict architectural boundaries, responsibilities
 
 ## 17. Evidence Ledger Module
 
-- **Responsibility:** Constructs and maintains immutable evidence links connecting every compliance evaluation result to its supporting document page, bounding-box, or API payload.
+- **Responsibility:** Constructs and maintains evidence links connecting every compliance evaluation result to its supporting document page, bounding-box, or API payload in a tamper-evident chain.
 - **Inputs:** Compliance Result IDs, Document Bounding-Boxes, API Response References.
 - **Outputs:** Cryptographically Bound Evidence Chains.
 - **Dependencies:** Document Intelligence Module, Government Verification Gateway.
@@ -212,9 +212,9 @@ This specification establishes strict architectural boundaries, responsibilities
 
 ## 18. Audit Trail Module
 
-- **Responsibility:** Records every system event, document ingestion, API call, rule execution, and human officer decision in an append-only log with SHA-256 hash chaining.
+- **Responsibility:** Records every system event, document ingestion, API call, rule execution, and human officer decision in an append-only, tamper-evident audit log with SHA-256 hash chaining.
 - **Inputs:** System Events, User Interaction Payloads.
-- **Outputs:** Immutable Audit Log Entries, Hash Integrity Audit Verification Reports.
+- **Outputs:** Tamper-Evident Audit Log Entries, Hash Integrity Audit Verification Reports.
 - **Dependencies:** All System Modules.
 - **Data Ownership:** `audit_logs`, `audit_hash_chain` database tables.
 - **MUST NOT DO:** MUST NOT support UPDATE or DELETE operations on audit log records.
@@ -245,10 +245,10 @@ This specification establishes strict architectural boundaries, responsibilities
 
 ## 21. Notification Subsystem Module
 
-- **Responsibility:** Dispatches async notifications (email, in-app alerts) to procurement officers for pending reviews, corrigendum updates, or system alerts.
+- **Responsibility:** Dispatches async notifications (email, in-app alerts) to procurement officers for pending reviews, corrigendum updates, or system alerts using Celery task workers.
 - **Inputs:** Notification Event Triggers, Recipient User IDs.
 - **Outputs:** Dispatched Message Logs, In-App Alert Records.
-- **Dependencies:** User Management Module, Redis Async Queue.
+- **Dependencies:** User Management Module, Celery + Redis Async Queue.
 - **Data Ownership:** `notifications` database table.
 - **MUST NOT DO:** MUST NOT alter evaluation state or bypass officer workflows.
 

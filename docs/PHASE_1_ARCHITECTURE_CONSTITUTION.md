@@ -6,7 +6,7 @@
 **Category:** Software | **Theme:** Smart Automation  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-001  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -68,10 +68,10 @@ The platform architecture is specified as a **Modular Monolith**.
 |-------|-----------------------|-----------------------------|
 | **Application Backend** | Python 3.11+ (FastAPI) | Asynchronous execution, native Pydantic typing for deterministic schemas, deep AI/ML library ecosystem |
 | **Presentation Frontend** | Next.js 14+ / React (TypeScript) | Component-driven UI, SSR/SSG capabilities, responsive dashboard layout, strong developer ecosystem |
-| **Primary Database** | PostgreSQL 16+ | Strong ACID compliance for decision workflows, native JSONB support for document metadata and rule execution traces |
-| **Cache & Async Coordinator** | Redis 7+ | Fast session management, verification result caching with TTL, background job queue management |
+| **Primary Database** | PostgreSQL 16+ (JSONB + pgvector) | Relational transactional data, JSONB for controlled flexible metadata, pgvector only where justified for future RAG/semantic retrieval requirements. (PostGIS explicitly excluded). |
+| **Cache & Async Coordinator** | Redis 7+ with Celery | Celery task worker + Redis as central message broker, task queue, background job coordinator, and ephemeral session cache with TTL. |
 | **Object Storage** | MinIO / S3-Compatible Storage | Encrypted storage for scanned PDFs and extracted document artifacts with SHA-256 hash validation |
-| **AI Provider Layer** | Gemini / OpenAI / Local LLM (Ollama) | Unified provider-agnostic abstraction for OCR token extraction and natural language explanation generation |
+| **AI Provider Layer** | Gemini / OpenAI / Local LLM (Ollama) | Unified provider-agnostic abstraction for OCR token extraction assistance and natural language explanation generation |
 | **Integration Layer** | Python Adapter Pattern | Isolation of external government integrations behind uniform `LIVE`, `SANDBOX`, `MOCK`, `MANUAL` interfaces |
 
 ---
@@ -122,7 +122,7 @@ The presentation layer MUST explicitly, visually label the verification provenan
 
 ## 6. Evidence-First Architecture & Provenance Model
 
-Every compliance result evaluated by the platform MUST be backed by an immutable, cryptographically verifiable evidence chain.
+Every compliance result evaluated by the platform MUST be backed by an evidence chain stored in a **tamper-evident audit trail**.
 
 ### 6.1 Conceptual Evidence Relationship
 
@@ -177,30 +177,33 @@ The compliance rule engine evaluates requirements using the standardized 8-state
 
 ---
 
-## 8. Three-Dimensional Compliance Scoring Model
+## 8. Separation of Compliance, Outcome, Confidence, and Risk
 
-The architecture explicitly rejects single percentage scoring in favor of a 3-dimensional analytical model:
+The architecture strictly separates four distinct analytical dimensions:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                THREE-DIMENSIONAL RISK MATRIX            │
-├───────────────────┬─────────────────────────────────────┤
-│ 1. COMPLIANCE     │ % of mandatory & preferred          │
-│    SCORE (0-100)  │ requirements evaluated as PASS      │
-├───────────────────┼─────────────────────────────────────┤
-│ 2. EVIDENCE       │ Weighted confidence & verifiability │
-│    CONFIDENCE     │ score of underlying evidence        │
-├───────────────────┼─────────────────────────────────────┤
-│ 3. RISK SCORE     │ Aggregate risk level from conflicts,│
-│    (0-100)        │ missing items, & debarment checks   │
-└───────────────────┴─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    FOUR SEPARATE ANALYTICAL DIMENSIONS                      │
+├───────────────────────┬─────────────────────────────────────────────────────┤
+│ 1. COMPLIANCE STATUS  │ Itemized requirement evaluation status              │
+│                       │ (PASS, FAIL, REVIEW, MISSING, EXPIRED, CONFLICT)    │
+├───────────────────────┼─────────────────────────────────────────────────────┤
+│ 2. QUALIFICATION      │ Overall bidder qualification outcome                │
+│    OUTCOME            │ (COMPLIANT, NOT COMPLIANT, PROVISIONAL)             │
+├───────────────────────┼─────────────────────────────────────────────────────┤
+│ 3. EVIDENCE CONFIDENCE│ Numeric/categorical metric (0.0 - 1.0) rating       │
+│                       │ document OCR quality and API verifiability          │
+├───────────────────────┼─────────────────────────────────────────────────────┤
+│ 4. RISK SCORE (0-100) │ Separate analytical score measuring anomalies,      │
+│                       │ data conflicts, verification failures, irregularities│
+└───────────────────────┴─────────────────────────────────────────────────────┘
 ```
 
-### Mandatory Non-Linear Escalation Rule
-Regardless of aggregate scores, if **ANY single mandatory requirement** yields a `FAIL` status or a debarment match is detected:
-- The **Risk Score** automatically escalates to `100.0 (CRITICAL)`.
-- The overall recommendation defaults to `DISQUALIFY`.
-- The procurement officer is alerted with a critical compliance red-flag card.
+### 8.1 Dimension Rules
+1. **Compliance Outcome Separation:** A mandatory requirement failure produces `Compliance Status = FAIL` and `Qualification Outcome = NOT COMPLIANT`.
+2. **Risk Score Scope:** Risk Score (0.0 to 100.0) is a separate analytical indicator evaluating anomaly indicators, conflicting information across documents/APIs, verification failures, suspicious patterns, document irregularities, and historical vendor risk indicators.
+3. **Non-Interference Rule:** Risk Score does NOT automatically escalate to 100 upon a mandatory requirement failure, nor does the Risk Score itself determine final qualification or disqualification.
+4. **Final Authority:** The Human Procurement Officer remains the sole decision authority for final qualification and award recommendations.
 
 ---
 
@@ -211,7 +214,7 @@ The platform provides a decision-support workbench for CPCL procurement officers
 1. **Evidence Inspection:** Officer views side-by-side split screen showing evaluation findings alongside original PDF documents with bounding-box highlights.
 2. **Provenance Traceability:** Officer clicks any value to view the complete API payload or OCR token coordinate snippet.
 3. **Authorized Manual Override:** Officer may override any system status (e.g., `FAIL` → `PASS`), requiring entry of a **mandatory non-empty justification rationale**.
-4. **Immutable Decision Recording:** The officer records the final status (`QUALIFY`, `DISQUALIFY`, `SEEK_CLARIFICATION`). The decision snapshot, rationale, user ID, timestamp, and evidence state are cryptographically sealed into the audit log.
+4. **Tamper-Evident Decision Recording:** The officer records the final status (`QUALIFY`, `DISQUALIFY`, `SEEK_CLARIFICATION`). The decision snapshot, rationale, user ID, timestamp, and evidence state are cryptographically sealed into the tamper-evident audit ledger.
 
 ---
 
@@ -234,7 +237,7 @@ If an external government portal or API fails (timeout, 5xx server error, rate l
 1. The adapter catches the failure and logs an `IntegrationFailureEvent`.
 2. The verification status transitions gracefully to `NOT_VERIFIED` or `MANUAL_FALLBACK`.
 3. The system DOES NOT fabricate a `PASS` or `FAIL`.
-4. The officer is notified with a option to trigger an async retry or perform a manual web-portal verification.
+4. The officer is notified with an option to trigger an async retry or perform a manual web-portal verification.
 5. Evaluation of other independent requirements continues uninterrupted (Circuit Breaker Pattern).
 
 ---

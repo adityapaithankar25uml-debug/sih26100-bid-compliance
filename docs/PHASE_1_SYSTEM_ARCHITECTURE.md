@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-002  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -45,8 +45,8 @@ The SIH 26100 platform is designed as a **Modular Monolith** with strict domain 
           │                          │                          │
 ┌─────────▼──────────────────────────▼──────────────────────────▼──────────┐
 │                         STORAGE & EVIDENCE LAYER                         │
-│ PostgreSQL (Entities/Rules) • MinIO (Documents) • Redis (Cache/Jobs)     │
-│ Evidence Ledger (SHA-256 Chain) • Audit Logger (Append-Only)             │
+│ PostgreSQL (Entities/Rules) • MinIO (Documents) • Redis (Celery Jobs)    │
+│ Evidence Ledger (SHA-256 Chain) • Audit Logger (Tamper-Evident)          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@ The SIH 26100 platform is designed as a **Modular Monolith** with strict domain 
 - **Framework:** Next.js 14+ (React / TypeScript).
 - **Core Interfaces:**
   - *Tender Setup Dashboard:* Upload Tender NIT, review AI-extracted criteria, configure rules.
-  - *Bidder Evaluation Matrix:* Overview of all submitted bidders with 3D compliance score indicators (Green/Yellow/Red cards).
+  - *Bidder Evaluation Matrix:* Overview of all submitted bidders with 4D compliance & risk indicators.
   - *Split-Screen Compliance Workbench:* Interactive evaluation panel on left; synchronized PDF document viewer with bounding-box highlights on right.
   - *Officer Decision & Audit Modal:* Manual override workflow, mandatory rationale entry, and cryptographic decision sign-off.
   - *Audit Log Timeline:* Searchable timeline of all system actions with SHA-256 hash integrity badges.
@@ -69,9 +69,9 @@ The SIH 26100 platform is designed as a **Modular Monolith** with strict domain 
 - **API Documentation:** Automatic OpenAPI 3.0 / Swagger UI schema generation.
 
 ### 2.3 Storage Layer
-- **PostgreSQL 16:** Relational storage for Tenders, Bidders, Requirements, Rule Definitions, Verification Records, and Audit Logs.
+- **PostgreSQL 16+:** Relational storage for Tenders, Bidders, Requirements, Rule Definitions, Verification Records, and Audit Logs. Includes `JSONB` for flexible metadata and `pgvector` only where justified for future RAG/semantic retrieval requirements. (PostGIS explicitly excluded).
 - **MinIO / Object Storage:** Encrypted blob storage for PDF/image uploads, extracted document pages, and visual bounding-box overlay artifacts.
-- **Redis 7:** Session state cache, API Setu/GST verification result cache (configured TTL), and async job queue management (Celery / ARQ).
+- **Redis 7+:** Central message broker and task queue for **Celery background workers**, session state cache, and API verification result cache (configured TTL).
 
 ---
 
@@ -186,10 +186,10 @@ The rule engine executes compliance logic using deterministic Python functions a
 
 ---
 
-## 6. Immutable Evidence Ledger & Audit Trail Architecture
+## 6. Tamper-Evident Evidence Ledger & Audit Trail Architecture
 
 ### 6.1 Cryptographic Hash Chaining Protocol
-All system actions, AI extractions, API calls, and human officer decisions are appended to an immutable audit log.
+All system actions, AI extractions, API calls, and human officer decisions are appended to a **tamper-evident audit log**.
 
 Log integrity is enforced via **SHA-256 Hash Chaining**:
 
@@ -204,7 +204,7 @@ $$\text{Block\_Hash}_n = \text{SHA-256}(\text{Block\_Hash}_{n-1} + \text{Timesta
 └─────────────────┘       └─────────────────┘       └─────────────────┘
 ```
 
-If any previous entry is modified or deleted, the hash chain breaks, immediately alerting system auditors to tampering.
+**Technical Clarification:** Cryptographic hash chaining provides immediate mathematical evidence of historical modification or tampering if any past log record is altered. However, it does not guarantee that a privileged database administrator cannot rewrite the entire log chain unless backed by external write-once-read-many (WORM) storage.
 
 ---
 
