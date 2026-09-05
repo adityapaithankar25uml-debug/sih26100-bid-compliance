@@ -491,5 +491,103 @@
 * **Consequences:** In-place database edits of evaluation records are strictly forbidden. All human overrides require explicit officer authentication, justification notes, and audit logging. Four-eyes dual control is enforced where enabled by policy.
 * **Rejected Alternatives:** In-place evaluation record edits or un-audited manual overrides (rejected due to breach of legal auditability).
 
+---
+
+### ADR-047: Modular Workflow Orchestration Boundary & Subsystem Isolation
+* **Context:** Coordinating the complex multi-stage bid compliance pipeline (ingestion, AI extraction, government verification, rule evaluation, risk scoring, officer review) without tight coupling or duplicating subsystem responsibilities.
+* **Options Considered:**
+  1. Hardcoding pipeline calls directly inside API endpoint handlers or microservices.
+  2. Stateless, event-driven `WorkflowOrchestrator` enforcing explicit task boundaries, dependency resolution, state transitions, and asynchronous execution across Task 1–6 subsystems.
+* **Decision:** Implement **Modular Workflow Orchestration Boundary & Subsystem Isolation**.
+* **Reason:** Preserves subsystem autonomy and modular monolith architecture principles. The orchestrator coordinates execution order and state transitions without embedding AI inference, government API logic, or rule AST evaluation code.
+* **Consequences:** Subsystems interact with the orchestrator via clean data contracts. Subsystem implementations remain isolated and independently testable.
+* **Rejected Alternatives:** Monolithic API-embedded pipeline calls or autonomous subsystem-to-subsystem direct chaining (rejected due to spaghetti coupling and loss of centralized workflow state governance).
+
+---
+
+### ADR-048: Multi-Dimensional Workflow State Machine vs Status Isolation
+* **Context:** Preventing technical execution states, business submission lifecycle states, rule compliance outcomes, qualification outcomes, and officer decision records from corrupting one another.
+* **Options Considered:**
+  1. Collapsing all system states into a single generic `status` string.
+  2. Isolated 5-Dimensional State Architecture (`WorkflowInstance` Execution State, Business Domain State, Compliance Status, Qualification Outcome, Officer Decision).
+* **Decision:** Implement **Multi-Dimensional Workflow State Machine vs Status Isolation**.
+* **Reason:** Guarantees domain precision and prevents invalid automated state mutation. A technical task failure (`FAILED`) never alters business compliance state or triggers automated bidder disqualification.
+* **Consequences:** Database models maintain distinct status fields. State transitions follow dedicated, audited transition matrices.
+* **Rejected Alternatives:** Single generic status field (rejected due to status ambiguity and illegal automated bidder disqualifications).
+
+---
+
+### ADR-049: Directed Acyclic Graph (DAG) Task Dependency Modeling & Cycle Prevention
+* **Context:** Structuring complex tender evaluation pipelines to maximize task parallelism (e.g. concurrent government verifications) while preventing execution deadlocks or circular task dependencies.
+* **Options Considered:**
+  1. Ad-hoc sequential task loops hardcoded in background scripts.
+  2. Declarative Directed Acyclic Graph (DAG) task dependency architecture with static Tarjan SCC cycle detection during workflow registration.
+* **Decision:** Implement **Directed Acyclic Graph (DAG) Task Dependency Modeling & Cycle Prevention**.
+* **Reason:** Maximizes workflow concurrency across independent verifications while guaranteeing zero runtime execution deadlocks or infinite loops.
+* **Consequences:** Workflow definitions must be registered as schema-validated DAGs. Definitions containing dependency cycles are rejected during administrative upload.
+* **Rejected Alternatives:** Hardcoded sequential loops or unvalidated runtime task graphs (rejected due to poor throughput and deadlock risks).
+
+---
+
+### ADR-050: At-Least-Once Job Delivery with Idempotent Workflow Handlers
+* **Context:** Guaranteeing consistent database state and evidence records when background workers retry tasks or handle duplicate network messages in distributed queues.
+* **Options Considered:**
+  1. Relying on queue-level exactly-once delivery guarantees.
+  2. At-Least-Once Delivery at queue level combined with 4-tier Idempotency Keys (API, Instance, Task, Govt Verification) protecting logical operations against duplicate side effects via durable idempotency records and concurrency-safe handler semantics, while distinct execution retries create distinct `TaskAttempt` records.
+* **Decision:** Implement **At-Least-Once Job Delivery with Idempotent Workflow Handlers**.
+* **Reason:** Exactly-once network delivery is mathematically impossible across distributed worker crashes. At-least-once delivery with idempotent application handlers guarantees zero duplicate side-effects. Database locking mechanisms serve as implementation options rather than rigid architectural bounds.
+* **Consequences:** All task handlers must check existing execution outputs and coordinate state before executing task logic.
+* **Rejected Alternatives:** Un-guaranteed exactly-once delivery assumptions (rejected due to duplicate side-effect vulnerabilities).
+
+---
+
+### ADR-051: Controlled Retry Classification, Backoff Jitter & Dead-Letter Handling
+* **Context:** Responding to infrastructure timeouts, network failures, corrupt input payloads, and government portal outages without causing retry storms or false compliance failures.
+* **Options Considered:**
+  1. Generic infinite retries or instant task abortion on any exception.
+  2. 4-Tier Fault Taxonomy (Transient, Permanent, Govt Business Result, Human Review) with Exponential Backoff + Equal Jitter and configurable retry parameters.
+* **Decision:** Implement **Controlled Retry Classification, Backoff Jitter & Dead-Letter Handling**.
+* **Reason:** Protects upstream government portals from thundering herd retry spikes. Isolate transient network issues from permanent payload errors.
+* **Consequences:** Transient errors retry gracefully; permanent errors isolate cleanly; business verification results pass to rule engine without retrying.
+* **Rejected Alternatives:** Uncontrolled immediate retries or immediate failure routing (rejected due to portal overload and system fragility).
+
+---
+
+### ADR-052: Checkpoint-Based Workflow Pause, Human Review & Non-Destructive Resume
+* **Context:** Handing off ambiguous, missing, or high-risk evaluation cases to Procurement Officers without losing processed work or corrupting machine trace histories.
+* **Options Considered:**
+  1. Aborting the workflow and requiring a full pipeline re-run after human intervention.
+  2. State Machine Checkpoint Pause (`RUNNING` $\rightarrow$ `WAITING` $\rightarrow$ `REQUIRES_HUMAN_REVIEW`), persisting task outputs to PostgreSQL, queuing items in Officer Workbench UI, and resuming cleanly upon authorized officer decision.
+* **Decision:** Implement **Checkpoint-Based Workflow Pause, Human Review & Non-Destructive Resume**.
+* **Reason:** Saves computation, minimizes external API overhead, and preserves legal accountability. The original evaluation trace remains locked while the officer's decision co-exists in audit storage.
+* **Consequences:** Workflows pause statefully and resume from saved checkpoints without re-evaluating completed upstream DAG nodes.
+* **Rejected Alternatives:** Pipeline abortion or in-place record mutation (rejected due to operational inefficiency and audit corruption).
+
+---
+
+### ADR-053: Two-Phase Graceful Workflow Cancellation Semantics (`CANCEL_REQUESTED` $\rightarrow$ `CANCELLED`)
+* **Context:** Terminating active or queued evaluation workflows safely upon authorized officer command without leaving orphan database locks or un-audited state.
+* **Options Considered:**
+  1. Abrupt worker process termination (`SIGKILL`).
+  2. Two-Phase Graceful Cancellation Protocol (`CANCEL_REQUESTED` $\rightarrow$ background worker checkpoint inspection $\rightarrow$ snapshot lock $\rightarrow$ `CANCELLED`), ensuring cancellation does not erase audit history or bypass required evidence retention governed by policy.
+* **Decision:** Implement **Two-Phase Graceful Workflow Cancellation Semantics**.
+* **Reason:** Prevents database corruption, partial un-audited writes, or lock starvation when a workflow is cancelled mid-execution.
+* **Consequences:** Active workers inspect cancellation flags at task boundaries and exit cleanly without committing partial results. Audit records and source documents remain retained according to applicable lifecycle policy.
+* **Rejected Alternatives:** Forceful worker termination or un-coordinated cancellation (rejected due to state corruption risks).
+
+---
+
+### ADR-054: Integration of Workflow Event Lineage into Tamper-Evident Audit Hash-Chain
+* **Context:** Providing legal proof of workflow execution lineage, stage transitions, task retries, and officer decisions for CVC vigilance audits.
+* **Options Considered:**
+  1. Standard application log files written to disk or centralized log collectors.
+  2. Integration of workflow state transition events into the Task 2 SHA-256 tamper-evident audit hash-chain (`AuditEvent`).
+* **Decision:** Implement **Integration of Workflow Event Lineage into Tamper-Evident Audit Hash-Chain**.
+* **Reason:** Ensures workflow history cannot be repudiated, edited, or deleted after execution. Every applicable workflow state change generates an `AuditEvent` that is linked into the existing tamper-evident SHA-256 hash-chain audit structure.
+* **Consequences:** All applicable workflow state changes generate hash-linked audit blocks in PostgreSQL without introducing digital PKI signature frameworks or second audit systems.
+* **Rejected Alternatives:** Ephemeral log files or un-chained database events (rejected due to audit non-repudiation requirements).
+
+
+
 
 
