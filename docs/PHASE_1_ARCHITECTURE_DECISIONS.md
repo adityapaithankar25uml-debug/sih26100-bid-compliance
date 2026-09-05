@@ -733,15 +733,165 @@
 
 ---
 
-### ADR-067: Layered Infrastructure, Network & Queue Transport Security Architecture
-* **Context:** Protecting Redis task queues, MinIO object stores, API gateways, and inter-service communications against network eavesdropping and queue abuse.
-* **Options Considered:**
-  1. Unencrypted internal container communications.
-  2. Layered Transport Security (TLS 1.3 for API/Redis, mTLS for internal microservices, private MinIO S3 buckets, payload ULID minimization, and dead-letter queues).
-* **Decision:** Implement **Layered Infrastructure, Network & Queue Transport Security Architecture**.
-* **Reason:** Applies zero-trust transport rules within the internal deployment boundary.
 * **Consequences:** Celery queue tasks carry minimal ULID references; Redis requires TLS and strong password authentication.
 * **Rejected Alternatives:** Un-encrypted internal channels or carrying raw PII payloads in queue messages.
+
+---
+
+### ADR-068: Structured JSON Observability Standard (`LogEvent` Schema)
+* **Context:** Providing machine-readable diagnostic logging across all platform micro-containers and background services.
+* **Options Considered:**
+  1. Unstructured free-text log strings written to standard output.
+  2. Standardized JSON `LogEvent` schema enforcing mandatory metadata fields (`timestamp`, `correlation_id`, `severity`, `event_category`, `component`, `environment`, `schema_version`).
+* **Decision:** Implement **Structured JSON Observability Standard (`LogEvent` Schema)**.
+* **Reason:** Enables automated log indexing, cross-service correlation, and rapid diagnostic parsing.
+* **Consequences:** All application subsystems output machine-readable JSON log events matching the `LogEvent` schema.
+* **Rejected Alternatives:** Free-text string logging or ad-hoc log field structures.
+
+---
+
+### ADR-069: Correlation-First Diagnostics Taxonomy Architecture (`correlationId`)
+* **Context:** Tracing complex bid evaluation transactions across API gateways, Celery worker DAGs, AI gateways, and government integration adapters.
+* **Options Considered:**
+  1. Independent per-service request IDs without cross-boundary propagation.
+  2. Correlation-First Diagnostics Taxonomy where correlation identifiers SHOULD be propagated whenever a causal relationship exists.
+* **Decision:** Implement **Correlation-First Diagnostics Taxonomy Architecture (`correlationId`)**.
+* **Reason:** Allows engineers and auditors to reconstruct complete end-to-end execution timelines using a correlation key whenever a causal relationship exists. Independently generated telemetry MAY use its own event, incident, or system identifiers when no originating request/workflow exists.
+* **Consequences:** Log events, trace spans, and async queue tasks carry `correlationId` when causally linked.
+* **Rejected Alternatives:** Isolated per-service IDs or un-correlated log streams.
+
+---
+
+### ADR-070: Operational Telemetry vs. Authoritative Audit Ledger Separation
+* **Context:** Preventing ephemeral diagnostic logging from being confused with legal compliance proof or CVC vigilance audit ledgers.
+* **Options Considered:**
+  1. Merging operational logs and audit events into a single log aggregation platform.
+  2. Strict architectural separation between ephemeral operational telemetry (`LogEvent`, `Span`) and the authoritative PostgreSQL SHA-256 hash-chained `AuditEvent` ledger.
+* **Decision:** Implement **Operational Telemetry vs. Authoritative Audit Ledger Separation**.
+* **Reason:** Protects the evidentiary integrity of the tamper-evident audit ledger while allowing ephemeral telemetry to be managed under policy-controlled retention policies.
+* **Consequences:** Telemetry logs reference `audit_event_id` but never replace or alter PostgreSQL audit chain records.
+* **Rejected Alternatives:** Single unified log store or relying on application logs for vigilance audit compliance.
+
+---
+
+### ADR-071: W3C Asynchronous Trace Context Propagation Architecture
+* **Context:** Maintaining distributed trace graphs across synchronous REST APIs and asynchronous Celery background queue execution.
+* **Options Considered:**
+  1. Tracing synchronous HTTP API endpoints only.
+  2. W3C Trace Context Propagation (`traceparent`, `tracestate`) injecting trace carriers into Redis message headers and Celery task metadata.
+* **Decision:** Implement **W3C Asynchronous Trace Context Propagation Architecture**.
+* **Reason:** Ensures distributed trace spans maintain parent-child relationships across asynchronous worker task retries.
+* **Consequences:** Retries create distinct child spans (`task_attempt_id`) linked to the master task operation span.
+* **Rejected Alternatives:** Synchronous-only tracing or un-linked background task execution traces.
+
+---
+
+### ADR-072: Privacy-Safe Pre-Log Telemetry Scrubbing & Redaction Pipeline
+* **Context:** Preventing application logs and trace attributes from accidentally capturing sensitive PII, PAN numbers, bank accounts, passwords, or API keys.
+* **Options Considered:**
+  1. Trusting application developers to manually sanitize log messages in code.
+  2. Pre-Log Privacy Proxy executing automated regex/NLP entity scrubbing, header suppression, and credential redaction before log emission.
+* **Decision:** Implement **Privacy-Safe Pre-Log Telemetry Scrubbing & Redaction Pipeline**.
+* **Reason:** Guarantees data privacy by design; prevents logs from becoming secondary data exfiltration paths.
+* **Consequences:** Passwords, API tokens, PAN numbers, and raw document contents are strictly stripped from all log outputs.
+* **Rejected Alternatives:** Un-sanitized raw logging or relying solely on manual developer compliance.
+
+---
+
+### ADR-073: Governed Metric Card Specification & High-Cardinality Protection
+* **Context:** Preventing metric store memory exhaustion caused by high-cardinality label explosion (e.g., embedding raw ULIDs or user names in Prometheus labels).
+* **Options Considered:**
+  1. Allowing dynamic label injection in application metric counters.
+  2. Governed Metric Card Specification enforcing strict label whitelists and prohibiting raw ULIDs or PII in metric dimensions.
+* **Decision:** Implement **Governed Metric Card Specification & High-Cardinality Protection**.
+* **Reason:** Protects metrics TSDB availability and ensures consistent metric aggregation across dashboards.
+* **Consequences:** Metric cards define exact label dimensions; high-cardinality raw IDs are strictly forbidden as labels.
+* **Rejected Alternatives:** Unrestricted metric label creation.
+
+---
+
+### ADR-074: AI Model Provenance & Non-Authoritative Telemetry Boundary
+* **Context:** Tracking AI provider performance, prompt template versions, and schema validation failures while enforcing non-authoritative AI boundaries.
+* **Options Considered:**
+  1. Using AI accuracy or token metrics to automatically trigger compliance qualification outcomes.
+  2. AI Telemetry (`AITelemetryEvent`) capturing provider, model version, prompt hash, and grounding status as pure operational telemetry.
+* **Decision:** Implement **AI Model Provenance & Non-Authoritative Telemetry Boundary**.
+* **Reason:** Preserves the core principle that AI is non-authoritative. AI metrics track system performance and CANNOT trigger compliance results.
+* **Consequences:** AI metrics are used for governance and alerting; compliance evaluations run strictly in the deterministic AST engine.
+* **Rejected Alternatives:** Treating AI metrics as qualification evidence.
+
+---
+
+### ADR-075: Government Integration Transport Failure vs. Business Result Telemetry Separation
+* **Context:** Monitoring government integration gateway connectivity without allowing portal timeouts or network glitches to fail bidder compliance evaluations.
+* **Options Considered:**
+  1. Logging a single generic failure event whenever a government API call fails.
+  2. Strict Telemetry Separation between technical transport status (`504 Gateway Timeout`) and domain business verification outcomes (`UNMATCHED`).
+* **Decision:** Implement **Government Integration Transport Failure vs. Business Result Telemetry Separation**.
+* **Reason:** Ensures technical infrastructure issues trigger transport retries or `MANUAL_FALLBACK` without falsely marking bidders as non-compliant.
+* **Consequences:** Telemetry logs `transport_status` and `business_verification_result` as separate attributes.
+* **Rejected Alternatives:** Merging transport errors with domain verification outcomes.
+
+---
+
+### ADR-076: Candidate Service Level Indicator (SLI) & Objective (SLO) Governance
+* **Context:** Setting quantitative reliability benchmarks across API, workflow, AI, government integration, and audit subsystems.
+* **Options Considered:**
+  1. Hardcoding static production Service Level Agreements (SLAs) in system code.
+  2. Framework of Candidate SLIs and Proposed SLOs evaluated over rolling 30-day windows.
+* **Decision:** Implement **Candidate Service Level Indicator (SLI) & Objective (SLO) Governance**.
+* **Reason:** Establishes clear engineering reliability targets while acknowledging that formal SLAs require department policy approval.
+* **Consequences:** Reliability metrics measure performance against proposed benchmarks (e.g., 99.5% API availability).
+* **Rejected Alternatives:** Hardcoding arbitrary production SLA guarantees in software architecture.
+
+---
+
+### ADR-077: Three-Tier Actionable Alert Hierarchy & Deduplication Framework
+* **Context:** Preventing notification noise and alert fatigue for on-call operations and security personnel.
+* **Options Considered:**
+  1. Triggering instant un-throttled emails/SMS for every log error string.
+  2. Three-Tier Alert Hierarchy (`CRITICAL`, `WARNING`, `INFORMATIONAL`) with mandatory deduplication windows, runbook links, and recovery conditions.
+* **Decision:** Implement **Three-Tier Actionable Alert Hierarchy & Deduplication Framework**.
+* **Reason:** Guarantees that every firing alert is high-signal, actionable, and linked to a concrete operational runbook.
+* **Consequences:** Repeated alerts within 15 minutes are deduplicated; critical alerts require clear diagnostic runbooks.
+* **Rejected Alternatives:** Un-throttled email notifications or non-actionable alert noise.
+
+---
+
+### ADR-078: Policy-Controlled Telemetry Retention & Dual-Control Legal Hold Governance
+* **Context:** Managing log and metric storage lifecycles while complying with statutory vigilance audit requirements.
+* **Options Considered:**
+  1. Universal static log retention periods (e.g., mandatory 10-year retention for all debug logs).
+  2. Policy-Controlled Telemetry Retention Engine supporting tier-specific lifecycles and dual-control `LegalHold` overrides.
+* **Decision:** Implement **Policy-Controlled Telemetry Retention & Dual-Control Legal Hold Governance**.
+* **Reason:** Optimizes storage expenditure while ensuring active vigilance investigations freeze log deletion schedules.
+* **Consequences:** Placing a `LegalHold` freezes retention cleanup; log disposal actions emit audit ledger events.
+* **Rejected Alternatives:** Static universal retention periods or un-gated automated log purging.
+
+---
+
+### ADR-079: Role-Based Observability Access Control & Diagnostic Access Auditing
+* **Context:** Restricting visibility of system log streams, trace spans, and operational dashboards to authorized user roles.
+* **Options Considered:**
+  1. Allowing all authenticated users full access to monitoring dashboards.
+  2. Role-Based Observability Access Control matrix enforcing organizational context filtering and logging all diagnostic access requests.
+* **Decision:** Implement **Role-Based Observability Access Control & Diagnostic Access Auditing**.
+* **Reason:** Prevents unauthorized procurement personnel from viewing cross-tenant metrics or sensitive system logs.
+* **Consequences:** Accessing raw diagnostic log viewers requires the `telemetry:read_diagnostics` capability and generates an audit log entry.
+* **Rejected Alternatives:** Unrestricted monitoring access or global admin dashboard permissions.
+
+---
+
+### ADR-080: Vendor-Neutral OpenTelemetry Abstraction Layer (`TelemetryProviderInterface`)
+* **Context:** Emitting telemetry data without locking the platform codebase to specific cloud vendors or proprietary monitoring SDKs.
+* **Options Considered:**
+  1. Integrating proprietary vendor monitoring SDKs directly into application route handlers.
+  2. Vendor-Neutral Telemetry Abstraction (`TelemetryProviderInterface`) supporting standard OpenTelemetry Protocol (OTLP) exports.
+* **Decision:** Implement **Vendor-Neutral OpenTelemetry Abstraction Layer (`TelemetryProviderInterface`)**.
+* **Reason:** Ensures application code remains completely independent of cloud monitoring vendors (AWS, Azure, GCP) or open-source backends (Grafana, OpenSearch).
+* **Consequences:** Telemetry exports follow standard OTLP specifications over gRPC/HTTP.
+* **Rejected Alternatives:** Direct proprietary vendor SDK integration.
+
 
 
 
