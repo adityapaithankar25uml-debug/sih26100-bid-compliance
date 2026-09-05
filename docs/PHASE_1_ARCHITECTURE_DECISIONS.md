@@ -892,6 +892,187 @@
 * **Consequences:** Telemetry exports follow standard OTLP specifications over gRPC/HTTP.
 * **Rejected Alternatives:** Direct proprietary vendor SDK integration.
 
+---
+
+### ADR-081: Four-Tier Environment Isolation & Data Protection Boundary
+* **Context:** Preventing production procurement bid data, live government payload credentials, and sensitive PII from leaking into development, testing, or staging environments.
+* **Options Considered:**
+  1. Shared database instances across development, staging, and production tiers.
+  2. Four-Tier Environment Isolation (`LOCAL`, `DEVELOPMENT`, `TEST_STAGING`, `PRODUCTION`) with zero automatic production data flow to lower environments and strict mock/sandbox government adapter scoping.
+* **Decision:** Implement **Four-Tier Environment Isolation & Data Protection Boundary**.
+* **Reason:** Guarantees data privacy by design, protects live government API credentials, and ensures lower environments operate strictly on synthetic or sanitized test data.
+* **Consequences:** Production VPCs share zero subnets, credentials, or databases with lower environment VPCs.
+* **Rejected Alternatives:** Shared development/staging database instances or automatic production data replication.
+
+---
+
+### ADR-082: Managed Container Compute Reference Architecture — AWS ECS Fargate
+* **Context:** Selecting a scalable, low-overhead container compute architecture for web API endpoints and background workers without managing virtual machine infrastructure.
+* **Options Considered:**
+  1. Managing self-hosted EC2 virtual machine instances with manual Docker orchestration.
+  2. Kubernetes cluster management (EKS).
+  3. Managed Container Compute Reference Architecture (AWS ECS Fargate) running isolated API, worker, and frontend container tasks.
+* **Decision:** Implement **Managed Container Compute Reference Architecture — AWS ECS Fargate**.
+* **Reason:** ECS Fargate is the selected AWS reference deployment model; the logical compute architecture remains portable to equivalent managed container platforms. Provides auto-scaling, process isolation, and minimal operational overhead for the SIH26100 platform while avoiding Kubernetes cluster management complexity.
+* **Consequences:** Application tasks execute as non-root container tasks on Fargate with defined vCPU/RAM profiles; logical containers remain portable across cloud infrastructure.
+* **Rejected Alternatives:** Un-orchestrated EC2 virtual machines or full EKS Kubernetes cluster management.
+
+---
+
+### ADR-083: Multi-Tier Network Segmentation & Private Subnet Isolation
+* **Context:** Preventing public internet access to core databases, Redis message brokers, background workers, and object storage buckets.
+* **Options Considered:**
+  1. Single public VPC subnet housing application containers and database endpoints.
+  2. Multi-Tier Network Segmentation allocating public DMZ subnets for ALB, private application subnets for API/UI tasks, and private data subnets for database/storage endpoints.
+* **Decision:** Implement **Multi-Tier Network Segmentation & Private Subnet Isolation**.
+* **Reason:** Enforces strict perimeter security; databases and Redis brokers carry zero public IP addresses and zero direct internet routing.
+* **Consequences:** Outbound internet access from private subnets for government integrations and AI calls routes exclusively through NAT Gateways with static Elastic IP allowlisting.
+* **Rejected Alternatives:** Publicly accessible database endpoints or single-subnet network topology.
+
+---
+
+### ADR-084: Four-Tier Infrastructure Trust Zone Architecture
+* **Context:** Defining infrastructure trust boundaries and component placement aligned with the Task 8 Security Architecture.
+* **Options Considered:**
+  1. Single flat trust boundary across all server components.
+  2. Four-Tier Infrastructure Trust Zone Mapping (Zone 0: Public, Zone 1: Ingress Buffer, Zone 2: App Core, Zone 3: Data Sanctuary).
+* **Decision:** Implement **Four-Tier Infrastructure Trust Zone Architecture**.
+* **Reason:** Enforces strict boundary crossings; data moving between trust zones requires explicit authentication, capability checks, and pre-log privacy scrubbing.
+* **Consequences:** Subsystems reside in explicit trust zones governed by fine-grained security group rules and IAM policies.
+* **Rejected Alternatives:** Flat unsegmented server network.
+
+---
+
+### ADR-085: Untrusted Document Processing Sandbox & Zero-Egress Isolation
+* **Context:** Protecting core application servers from malicious PDF files, embedded macros, or OCR parsing exploits uploaded by untrusted bidders.
+* **Options Considered:**
+  1. Executing PDF parsing and OCR extraction directly on main web API container instances.
+  2. Isolated Untrusted Document Processing Sandbox running in dedicated worker containers in a network-isolated execution boundary with read-only filesystems and strict memory limits.
+* **Decision:** Implement **Untrusted Document Processing Sandbox & Zero-Egress Isolation**.
+* **Reason:** Isolates untrusted document processing; document-processing workloads operate in a network-isolated execution boundary with no outbound network access by default; implementation may use runtime-specific network isolation such as disabled networking.
+* **Consequences:** Malware or parsing exploits cannot execute network callbacks or compromise the primary database.
+* **Rejected Alternatives:** Parsing untrusted uploads directly inside web API tasks.
+
+---
+
+### ADR-086: Multi-AZ Relational Database Deployment & Synchronous Failover (PostgreSQL)
+* **Context:** Guaranteeing high availability, point-in-time recovery, and zero data loss for PostgreSQL (`pgvector`, JSONB, ULIDs, tamper-evident audit ledger).
+* **Options Considered:**
+  1. Single-node PostgreSQL database instance without replica failover.
+  2. Multi-AZ Managed PostgreSQL Deployment with synchronous physical standby replication, Continuous WAL streaming, and automated DNS failover.
+* **Decision:** Implement **Multi-AZ Relational Database Deployment & Synchronous Failover**.
+* **Reason:** Protects core procurement facts and audit ledgers against single-AZ cloud infrastructure outages ($< 60$s automatic failover).
+* **Consequences:** Primary database commits stream synchronously to standby replicas; PgBouncer handles client connection pooling.
+* **Rejected Alternatives:** Single-AZ database deployment or asynchronous un-monitored replication.
+
+---
+
+### ADR-087: Isolated Multi-Pool Redis & Celery Worker Deployment
+* **Context:** Preventing background document processing or OCR batch tasks from starving interactive procurement officer workbench actions.
+* **Options Considered:**
+  1. Single monolithic Celery worker pool processing all background tasks from one queue.
+  2. Isolated Multi-Pool Celery Worker Strategy distributing tasks across dedicated queues (`high-priority`, `workflows`, `doc-processing`, `govt-verifications`) with tailored concurrency and logical Redis workload isolation.
+* **Decision:** Implement **Isolated Multi-Pool Redis & Celery Worker Deployment**.
+* **Reason:** Guarantees sub-second responsiveness for officer workbench actions. Logical isolation of task brokerage, idempotency/cache functions, rate limiting, and other workloads SHALL use dedicated Redis deployments, logical isolation, namespaces/keyspaces, or equivalent mechanisms according to operational and security requirements. Redis deployment uses an availability architecture appropriate to the selected Redis-compatible service, including multi-AZ/failover capabilities where supported and required.
+* **Consequences:** Worker tasks scale independently based on queue-specific depth metrics without coupling telemetry to task processing.
+* **Rejected Alternatives:** Single global Celery worker queue or hardcoded logical database coupling.
+
+---
+
+### ADR-088: Multi-Bucket Object Storage Taxonomy & Legal Hold Governance
+* **Context:** Managing raw untrusted bidder file uploads, sanitized disarmed documents, extracted evidence packages, and system audit reports.
+* **Options Considered:**
+  1. Storing all files in a single flat storage bucket with uniform permissions.
+  2. Multi-Bucket Object Storage Taxonomy (`quarantine-raw`, `clean-documents`, `evidence-ledger`, `reports-audit`) with KMS-SSE encryption, optional Object Lock WORM controls, and legal hold support.
+* **Decision:** Implement **Multi-Bucket Object Storage Taxonomy & Legal Hold Governance**.
+* **Reason:** Separates untrusted raw uploads from sanitized clean assets. Original bidder submissions MAY use object-lock/WORM controls where required by approved retention, legal-hold, and evidence-governance policy while preserving original SHA-256 hash provenance.
+* **Consequences:** Storage lifecycle purges follow approved retention policies; legal holds override dynamic retention purges.
+* **Rejected Alternatives:** Single flat storage bucket.
+
+---
+
+### ADR-089: KMS Envelope Encryption & Dynamic Secret Injection Boundary
+* **Context:** Managing database passwords, Redis tokens, government certificates, and AI provider API keys without hardcoding credentials in code or Git repositories.
+* **Options Considered:**
+  1. Storing secrets in application configuration files or container environment variables written to Git.
+  2. Centralized Secret Manager & KMS Envelope Encryption injecting secrets dynamically into container task memory at runtime.
+* **Decision:** Implement **KMS Envelope Encryption & Dynamic Secret Injection Boundary**.
+* **Reason:** Prevents secret leakage in code repositories, container images, or build logs.
+* **Consequences:** Secrets are encrypted using customer-managed KMS keys and rotated on policy-defined schedules (30–90 days).
+* **Rejected Alternatives:** Hardcoded secrets in code, Git, or Dockerfiles.
+
+---
+
+### ADR-090: Machine Service Identity Least-Privilege IAM Scoping
+* **Context:** Granting container workloads infrastructure permissions without providing broad AWS administrative rights.
+* **Options Considered:**
+  1. Sharing a single administrative IAM role across all container tasks.
+  2. Dedicated Task IAM Execution Roles (`role-sih26100-api-task`, `role-sih26100-worker-doc-task`, `role-sih26100-worker-govt-task`) enforcing strict resource least privilege.
+* **Decision:** Implement **Machine Service Identity Least-Privilege IAM Scoping**.
+* **Reason:** Limits blast radius if a single container workload is compromised.
+* **Consequences:** The document parsing task role cannot access government secrets or write to PostgreSQL audit tables.
+* **Rejected Alternatives:** Global shared container IAM role.
+
+---
+
+### ADR-091: CI/CD Supply-Chain Vulnerability Gates & SBOM Provenance Verification
+* **Context:** Securing software build pipelines against compromised third-party dependencies, malicious packages, or unauthorized container images.
+* **Options Considered:**
+  1. Building and deploying container images without automated dependency or vulnerability checks.
+  2. Multi-Stage CI/CD Security Pipeline enforcing static analysis, secret scanning, dependency audits, SBOM generation, container scanning, and artifact provenance signatures.
+* **Decision:** Implement **CI/CD Supply-Chain Vulnerability Gates & SBOM Provenance Verification**.
+* **Reason:** Protects software supply chain integrity before code reaches production environments. Artifact signing/provenance is a supply-chain security control and is independent of the application's tamper-evident AuditEvent SHA-256 hash chain.
+* **Consequences:** Images containing critical CVEs or violating vulnerability policies are automatically rejected by deployment gates; no digital signatures are added to AuditEvent.
+* **Rejected Alternatives:** Un-scanned container image builds.
+
+---
+
+### ADR-092: Zero-Downtime Blue/Green Release Deployment Strategy
+* **Context:** Deploying application updates to production without interrupting active procurement officer reviews or causing HTTP 5xx errors.
+* **Options Considered:**
+  1. In-place container task restarts (causing temporary service downtime).
+  2. Blue/Green Deployment Strategy deploying parallel task sets, verifying health check readiness, and shifting ALB target group traffic weights.
+* **Decision:** Implement **Zero-Downtime Blue/Green Release Deployment Strategy**.
+* **Reason:** Provides seamless zero-downtime release deployments with controlled traffic cutover after required health/readiness checks satisfy approved release policy. Automated rollback MAY be triggered when configured release-health criteria are violated; otherwise the deployment enters operator review/escalation.
+* **Consequences:** Production deployments provision green task sets, verify readiness according to policy, and shift traffic smoothly.
+* **Rejected Alternatives:** In-place container task restarts or un-monitored rolling deployments.
+
+---
+
+### ADR-093: Expand/Contract Database Schema Migration Pattern
+* **Context:** Modifying PostgreSQL relational database schemas during application releases without locking production tables or crashing active web API tasks.
+* **Options Considered:**
+  1. Executing destructive DDL migrations directly during container startup.
+  2. Expand/Contract Database Migration Pattern executing additive DDL changes first, deploying dual-reading application tasks, backfilling historical data, and dropping deprecated columns in subsequent releases.
+* **Decision:** Implement **Expand/Contract Database Schema Migration Pattern**.
+* **Reason:** Prevents database downtime, table locking failures, and application incompatibility during schema evolution.
+* **Consequences:** DDL changes set 5-second statement timeouts; migrations execute via dedicated pre-deployment tasks.
+* **Rejected Alternatives:** Destructive synchronous DDL migrations at container startup.
+
+---
+
+### ADR-094: Controlled Egress Government Network Gateway Architecture
+* **Context:** Routing outbound government integration adapter requests safely while satisfying external portal IP allowlisting and transport security requirements.
+* **Options Considered:**
+  1. Direct un-controlled outbound internet access from container tasks with dynamic public IPs.
+  2. Controlled Egress Government Gateway Architecture routing outbound government adapter traffic through controlled egress gateways with static IP allowlisting (where required/supported) and secure TLS transport with certificate validation (pinning/mTLS where explicitly required).
+* **Decision:** Implement **Controlled Egress Government Network Gateway Architecture**.
+* **Reason:** Satisfies government security onboarding requirements (static IP allowlisting where required, TLS certificate validation) while isolating application core logic.
+* **Consequences:** Outbound government API calls route through controlled gateways with circuit breaker protection and integration-appropriate transport validation.
+* **Rejected Alternatives:** Direct un-gated outbound internet calls from web API tasks.
+
+---
+
+### ADR-095: Feature Flag Governance & Auditable Environment Scoping
+* **Context:** Toggling application operational modes (e.g. government adapter LIVE/MOCK modes, AI Gateway routing targets) dynamically at runtime.
+* **Options Considered:**
+  1. Hardcoding environment settings in application source code or un-audited environment variables.
+  2. Governed Feature Flag Architecture with auditable toggle events, scope parameters, and strict security isolation.
+* **Decision:** Implement **Feature Flag Governance & Auditable Environment Scoping**.
+* **Reason:** Allows operations teams to switch adapter modes or AI fallback routes dynamically; all flag modifications emit audit log events.
+* **Consequences:** Feature flags cannot bypass authentication or deterministic compliance evaluation rules.
+* **Rejected Alternatives:** Hardcoded runtime flags or un-audited configuration overrides.
+
 
 
 
