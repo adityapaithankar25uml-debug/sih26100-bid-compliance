@@ -1,9 +1,9 @@
 # SIH 26100 Project Status
 
 Current Phase: Phase 1
-Status: Phase 1 Task 7 — Workflow, Orchestration & Job Execution Architecture — Design Draft / Pending Review
-Implementation Status: ZERO APPLICATION CODE (Workflow Architecture Specifications Only)
-Next Phase: Phase 1 — Task 8 (Pending User Review)
+Status: Phase 1 Task 8 — Security, Privacy, Threat Modeling & Trust Architecture — Design Draft / Pending Review
+Implementation Status: ZERO APPLICATION CODE (Security Architecture Specifications Only)
+Next Phase: Task 9 / Security Architecture Review (Pending User Review)
 
 Problem Statement:
 AI-Powered Integrated Bid Compliance Verification Platform for GeM Procurement
@@ -117,7 +117,7 @@ Smart Automation
   - Status Separation Integrity: `MISSING_EVIDENCE` or `NOT_VERIFIED` strictly routes to `REQUIRES_HUMAN_REVIEW` / `PENDING_REVIEW` and NEVER automatically triggers `FAIL` or `NOT_QUALIFIED`.
   - Targeted Quality Correction Pass Applied: Clarified configurable AST resource limits (non-normative illustrative defaults), refined required provenance as a required design property rather than an empirical 100% guarantee, framed historical evaluation reproducibility as a system design objective, bound tender version selection to full lifecycle criteria (TenderVersion, corrigenda, timestamps, selection basis), codified 7-dimensional source/evaluation quality taxonomy to avoid single ambiguous confidence values, confirmed four-eyes review as policy-controlled (not universally hardcoded), established governed rule taxonomy extensibility, and aligned rule test profile coverage with applicable test profiles.
 
-- **Phase 1 — Workflow, Orchestration & Job Execution Architecture (Task 7 — Design Draft / Pending Review):**
+- **Phase 1 — Workflow, Orchestration & Job Execution Architecture (Task 7 — Design Complete, Frozen Baseline):**
   - High-Level Workflow & Orchestration Architecture ([PHASE_1_WORKFLOW_ARCHITECTURE.md](file:///d:/PROJECTS/Bidder_AI/sih26100-bid-compliance/docs/PHASE_1_WORKFLOW_ARCHITECTURE.md))
   - Bid Verification Master Workflow Lifecycle Specification ([PHASE_1_WORKFLOW_LIFECYCLE.md](file:///d:/PROJECTS/Bidder_AI/sih26100-bid-compliance/docs/PHASE_1_WORKFLOW_LIFECYCLE.md))
   - Async Job Orchestration, Queueing & Polling Architecture ([PHASE_1_JOB_ORCHESTRATION.md](file:///d:/PROJECTS/Bidder_AI/sih26100-bid-compliance/docs/PHASE_1_JOB_ORCHESTRATION.md))
@@ -135,7 +135,7 @@ Smart Automation
   - Multi-Dimensional State Isolation Enforced: Technical execution state (`NOT_STARTED`/`RUNNING`/`SUCCEEDED`), business domain state (`SUBMITTED`/`COMPLETED`), compliance status (`PASS`/`FAIL`), qualification outcome (`QUALIFIED`/`NOT_QUALIFIED`), and human decision (`OfficerDecision`) are explicitly isolated. Technical task failures NEVER trigger automated business disqualification.
   - At-Least-Once Delivery & Idempotency: Configured with 4-tier idempotency keys (`API`, `WorkflowInstance`, `Task`, `GovtVerification`) protecting logical operations against duplicate side effects, while distinct execution retries create distinct `TaskAttempt` records.
   - Checkpoint Pause & Non-Destructive Resume: Preserves intermediate `NormalizedFact` and `EvidenceRecord` data in PostgreSQL while awaiting human review in `REQUIRES_HUMAN_REVIEW` status.
-  - Two-Phase Graceful Cancellation: Implements `CANCEL_REQUESTED` $\rightarrow$ `CANCELLED` protocol to terminate worker loops cleanly without corrupting audit records, with retention governed by applicable policy.
+  - Two-Phase Graceful Cancellation: Implements `CANCEL_REQUESTED` → `CANCELLED` protocol to terminate worker loops cleanly without corrupting audit records, with retention governed by applicable policy.
   - Targeted Quality Correction Pass Applied: Removed digital signature claims from `AuditEvent` lineage (retaining SHA-256 hash-chain linkage), replaced permanent retention claims with policy-controlled lifecycle retention, clarified operation identity vs retry `TaskAttempt` records, framed database locking as an implementation option, and confirmed zero PKI/signature framework additions.
   - Implementation Notice: ZERO application code written, zero FastAPI routers created, zero DB migrations generated, zero Celery workers configured, zero external APIs called, zero LLM calls executed, zero credentials/secrets added, implementation has NOT started, and Task 8 has NOT started.
 

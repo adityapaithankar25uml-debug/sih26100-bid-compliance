@@ -587,6 +587,163 @@
 * **Consequences:** All applicable workflow state changes generate hash-linked audit blocks in PostgreSQL without introducing digital PKI signature frameworks or second audit systems.
 * **Rejected Alternatives:** Ephemeral log files or un-chained database events (rejected due to audit non-repudiation requirements).
 
+---
+
+### ADR-055: Unified Centralized Security Boundary & Defense-in-Depth Architecture
+* **Context:** Protecting sensitive procurement filings, commercial bidder financials, government verification data, and AI pipelines across complex execution environments.
+* **Options Considered:**
+  1. Ad-hoc per-service security checks without formal trust boundaries.
+  2. Unified Defense-in-Depth Security Boundary Architecture classifying system assets into four formal trust zones (Level 0 Untrusted, Level 1 External Dependency, Level 2 Ingress Gateway, Level 3 Trusted Core).
+* **Decision:** Implement **Unified Centralized Security Boundary & Defense-in-Depth Architecture**.
+* **Reason:** Ensures every boundary crossing enforces explicit authentication, authorization, validation, and audit logging.
+* **Consequences:** Systems enforce defense-in-depth across 7 security dimensions without relying on implicit network trust.
+* **Rejected Alternatives:** Perimeter-only security models or unmediated inter-service calls.
+
+---
+
+### ADR-056: Multi-Dimensional Authorization Matrix (RBAC + Capability + Context + Sensitivity)
+* **Context:** Preventing unauthorized cross-tenant data access, privilege escalation, and un-audited manual overrides.
+* **Options Considered:**
+  1. Basic Role-Based Access Control (RBAC) checking single role strings.
+  2. Multi-Dimensional Authorization Formula ($\text{WHO} + \text{ACTION} + \text{RESOURCE} + \text{ORG_CONTEXT} + \text{CLASSIFICATION}$).
+* **Decision:** Implement **Multi-Dimensional Authorization Matrix**.
+* **Reason:** Provides fine-grained capability checks bound to organizational procurement contexts and data sensitivity levels.
+* **Consequences:** Procurement officers can access only assigned bids within their organization; unmasking PII requires explicit capabilities.
+* **Rejected Alternatives:** Coarse role-only authorization or global admin permissions.
+
+---
+
+### ADR-057: Policy-Controlled Multi-Factor Authentication & Identity Provider Abstraction
+* **Context:** Authenticating human users while preventing vendor lock-in to cloud identity platforms.
+* **Options Considered:**
+  1. Custom internal password storage and basic session tokens.
+  2. Identity Provider Abstraction (`IdentityProviderInterface`) supporting OIDC/OAuth2 with policy-controlled MFA and step-up authentication.
+* **Decision:** Implement **Policy-Controlled Multi-Factor Authentication & Identity Provider Abstraction**.
+* **Reason:** Leverages enterprise OIDC identity providers while enforcing policy-based MFA for high-risk operations (manual overrides, tender approvals).
+* **Consequences:** Short-lived JWT access tokens (15-min) paired with silent OAuth2 refresh and Redis token blocklisting.
+* **Rejected Alternatives:** Monolithic internal user password tables or static long-lived API tokens.
+
+---
+
+### ADR-058: Security & Sensitivity Data Classification System Enforcement (PUBLIC to PII)
+* **Context:** Managing data handling rules across diverse procurement artifacts, bidder financial balance sheets, and government verification responses.
+* **Options Considered:**
+  1. Uniform security handling across all database fields.
+  2. 5-Tier Data Classification System (`PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `RESTRICTED`, `PII`) governing storage, masking, encryption, and AI routing eligibility.
+* **Decision:** Implement **Security & Sensitivity Data Classification System Enforcement**.
+* **Reason:** Aligns data sensitivity with handling rules; prevents PII and restricted identifiers from entering external AI prompts.
+* **Consequences:** Classification governs handling but does not replace authorization checks; PII can co-exist inside multi-level documents.
+* **Rejected Alternatives:** Single security level for all data items.
+
+---
+
+### ADR-059: Pre-AI Privacy Gateway & Reversible Entity Tokenization Pipeline
+* **Context:** Using cloud LLM providers for document extraction without exposing unredacted bidder PII, PAN numbers, or financial secrets.
+* **Options Considered:**
+  1. Transmitting raw extracted document text directly to external cloud LLM APIs.
+  2. Pre-AI Privacy Gateway executing regex/NLP entity detection, replacing PII with reversible tokens (`[PII_TOKEN_1]`), and de-tokenizing structured responses inside local application RAM.
+* **Decision:** Implement **Pre-AI Privacy Gateway & Reversible Entity Tokenization Pipeline**.
+* **Reason:** Guarantees data privacy while maintaining structured AI extraction quality.
+* **Consequences:** Sensitive identifiers never cross the Level 3 boundary to external cloud LLMs.
+* **Rejected Alternatives:** Direct un-redacted prompt transmission or relying solely on LLM provider privacy promises.
+
+---
+
+### ADR-060: Multi-Stage Document Upload Quarantine & CDR Isolation Pipeline
+* **Context:** Protecting server infrastructure and document parsers against malware, executable macros, zip bombs, and polyglot files.
+* **Options Considered:**
+  1. Saving uploaded files directly to primary document storage buckets.
+  2. Multi-Stage Ingestion Pipeline (`Staging Quarantine` $\rightarrow$ Magic Byte Validation $\rightarrow$ Containerized ClamAV Scan $\rightarrow$ CDR Disarm $\rightarrow$ SHA-256 Hashing $\rightarrow$ MinIO Promotion).
+* **Decision:** Implement **Multi-Stage Document Upload Quarantine & CDR Isolation Pipeline**.
+* **Reason:** Treats all uploaded files as untrusted content, containing malware and exploits before storage.
+* **Consequences:** Ingestion enforces policy-configurable size limits, uncompressed expansion caps (10:1 ratio limit), and isolated sandbox parsing.
+* **Rejected Alternatives:** Immediate primary bucket storage or un-sandboxed document parsing.
+
+---
+
+### ADR-061: Centralized Secret Isolation & KMS Abstraction Boundary
+* **Context:** Preventing exposure of government API keys, database passwords, mTLS certificates, and JWT signing keys.
+* **Options Considered:**
+  1. Storing credentials in application source code, configuration files, or database tables.
+  2. Centralized Secret Manager Abstraction (`SecretManagerInterface`) loading secrets dynamically into process memory at runtime.
+* **Decision:** Implement **Centralized Secret Isolation & KMS Abstraction Boundary**.
+* **Reason:** Ensures zero secrets are stored in Git repositories, frontend bundles, AI prompts, or log files.
+* **Consequences:** Supports zero-downtime secret rotation and scoped credential access per service.
+* **Rejected Alternatives:** Hardcoded secrets, Git-committed configuration files, or user-supplied API keys.
+
+---
+
+### ADR-062: Defense-in-Depth Field-Level AES-256-GCM Encryption Architecture
+* **Context:** Safeguarding highly sensitive fields (PAN, GSTIN, bank details, government payloads) stored in PostgreSQL against database theft or raw disk inspection.
+* **Options Considered:**
+  1. Relying solely on full-disk database encryption.
+  2. Layered Field-Level AES-256-GCM Encryption for `RESTRICTED` and `PII` fields with entity ULID Additional Authenticated Data (AAD), operating alongside database disk encryption.
+* **Decision:** Implement **Defense-in-Depth Field-Level AES-256-GCM Encryption Architecture**.
+* **Reason:** Provides defense-in-depth; protects sensitive data fields even if raw database tables are compromised.
+* **Consequences:** Application encrypts sensitive attributes before SQL persistence; AAD prevents ciphertext swapping across rows.
+* **Rejected Alternatives:** Disk-only database encryption or unencrypted sensitive fields.
+
+---
+
+### ADR-063: Quad-Operating Mode Government Credential Isolation & Transport Security
+* **Context:** Securing integrations with external government portals (MCA, GSTN, MSME, Income Tax) while maintaining resilience during portal outages.
+* **Options Considered:**
+  1. Uniform live external API calls for all environments.
+  2. Quad-Operating Modes (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL_FALLBACK`) with mTLS transport, circuit breaker isolation, and transport status separation.
+* **Decision:** Implement **Quad-Operating Mode Government Credential Isolation & Transport Security**.
+* **Reason:** Shields production government API credentials to `LIVE` mode, enables isolated testing, and prevents portal timeouts from causing false compliance failures.
+* **Consequences:** Technical transport failures (`504 Gateway Timeout`) route cleanly to `MANUAL_FALLBACK` without triggering a business compliance `FAIL`.
+* **Rejected Alternatives:** Hardcoded live API calls or allowing transport errors to fail compliance evaluations.
+
+---
+
+### ADR-064: Hash-Chained Audit Lineage Protection without Digital Signatures
+* **Context:** Guaranteeing tamper evidence and non-repudiation for all workflow state transitions, rule evaluations, and human decisions.
+* **Options Considered:**
+  1. PKI digital signature framework for every audit event.
+  2. SHA-256 Hash-Chained Audit Ledger ($H_n = \text{SHA256}(H_{n-1} \parallel P_n)$) using append-only database roles.
+* **Decision:** Implement **Hash-Chained Audit Lineage Protection without Digital Signatures**.
+* **Reason:** Delivers complete tamper evidence and mathematical non-repudiation aligned with Task 2 baseline without the extreme operational complexity and performance overhead of PKI certificate infrastructure.
+* **Consequences:** Any alteration of historical audit entries breaks forward hash linkages; daily audit verification jobs detect tampering instantly.
+* **Rejected Alternatives:** Complex PKI digital signature audit chains or un-chained database logs.
+
+---
+
+### ADR-065: Threat-Model-Driven SDLC Security Gates & Risk Benchmarks
+* **Context:** Establishing security validation standards across development, testing, and operational release phases.
+* **Options Considered:**
+  1. Claims of 100% security or zero software vulnerabilities.
+  2. Threat-Model-Driven SDLC framework (11 gates from Architecture Review to Penetration Testing) governed by explicit risk-driven acceptance criteria.
+* **Decision:** Implement **Threat-Model-Driven SDLC Security Gates & Risk Benchmarks**.
+* **Reason:** Replaces unrealistic claims with rigorous, benchmark-based security validation.
+* **Consequences:** All security testing protocols are explicitly framed as future implementation and operational controls.
+* **Rejected Alternatives:** Claims of absolute zero vulnerability or un-gated release processes.
+
+---
+
+### ADR-066: Policy-Controlled Dynamic Data Retention & Legal Hold Subsystem
+* **Context:** Managing retention and deletion of bid documents, normalized facts, evidence, and audit logs according to statutory compliance requirements.
+* **Options Considered:**
+  1. Universal hardcoded retention periods (e.g., mandatory 10-year retention for all files).
+  2. Policy-Controlled Lifecycle Engine dynamically bound to `PolicyVersion` settings, supporting soft-deletion, secure MinIO purging, and dual-control Legal Holds.
+* **Decision:** Implement **Policy-Controlled Dynamic Data Retention & Legal Hold Subsystem**.
+* **Reason:** Provides operational flexibility while protecting active investigations from automated data deletion.
+* **Consequences:** Placing a `LegalHold` freezes all deletion schedules; audit tombstone ledgers preserve permanent disposal traces.
+* **Rejected Alternatives:** Hardcoded universal retention periods or un-gated automated file deletion.
+
+---
+
+### ADR-067: Layered Infrastructure, Network & Queue Transport Security Architecture
+* **Context:** Protecting Redis task queues, MinIO object stores, API gateways, and inter-service communications against network eavesdropping and queue abuse.
+* **Options Considered:**
+  1. Unencrypted internal container communications.
+  2. Layered Transport Security (TLS 1.3 for API/Redis, mTLS for internal microservices, private MinIO S3 buckets, payload ULID minimization, and dead-letter queues).
+* **Decision:** Implement **Layered Infrastructure, Network & Queue Transport Security Architecture**.
+* **Reason:** Applies zero-trust transport rules within the internal deployment boundary.
+* **Consequences:** Celery queue tasks carry minimal ULID references; Redis requires TLS and strong password authentication.
+* **Rejected Alternatives:** Un-encrypted internal channels or carrying raw PII payloads in queue messages.
+
+
 
 
 
