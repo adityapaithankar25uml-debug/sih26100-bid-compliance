@@ -32,9 +32,10 @@
 
 The AI architecture strictly maintains these operational guardrails:
 1. **AI is non-authoritative:** AI outputs are candidate extraction proposals, semantic comparisons, anomaly alerts, or explanatory text. AI outputs NEVER independently qualify or disqualify a bidder.
-2. **Deterministic Rules & Authoritative Sources Overrule AI:** Government databases (GSTN, MCA, Udyam, EPFO) and deterministic Python rule engines are the sole authoritative sources for verification and evaluation.
-3. **No Direct State Mutation:** AI pipelines CANNOT create `OfficerDecision` records, update `QualificationOutcome` statuses, execute manual overrides, or invoke government verification adapters directly.
+2. **Authorized Sources & Deterministic Rules Overrule AI:** Authorized government sources remain authoritative where the organization has an approved and operational integration mechanism. The architecture does not assume that a public API exists for every source or workflow. Integration adapters support `LIVE`, `SANDBOX`, `MOCK`, and `MANUAL_FALLBACK` modes subject to onboarding/authorization requirements. Deterministic Python rule engines are the sole authoritative sources for compliance evaluation.
+3. **No Direct Tool Side-Effects or State Mutation:** AI models have no arbitrary tool or side-effect permissions. AI models CANNOT create `OfficerDecision` records, update `QualificationOutcome` statuses, execute manual overrides, or invoke government verification adapters directly. Controlled application services invoke the approved AI Gateway on behalf of the workflow.
 4. **Analytical Metric Isolation:** AI confidence (0.0 to 1.0) is strictly separated from Evidence Confidence, Compliance Status (`PASS`/`FAIL`), Risk Score (0.0 to 100.0), and Qualification Outcome (`QUALIFIED`/`DISQUALIFIED`).
+5. **Contextual PII Data Minimization:** PII handling is based on sensitivity, purpose, necessity, and organizational policy. Unnecessary personal information is minimized/redacted before external AI processing, while legitimate business/procurement information required for the workflow is retained where permitted.
 
 ---
 
@@ -49,7 +50,7 @@ The platform utilizes AI for 14 targeted bid compliance interpretation tasks:
 - **Expected Structured Output:** `DocumentClassificationEnvelope` containing `predicted_doc_type`, `confidence_score`, `page_range`.
 - **Validation:** Pydantic schema validation; magic-byte format matching.
 - **Provenance:** Document ULID, page numbers, text chunk offset.
-- **Confidence Handling:** If confidence < 0.85, flagged for human officer classification confirmation.
+- **Confidence Handling:** AI confidence thresholds are task-specific, configurable, and established through benchmark calibration. Low-confidence outputs trigger human officer classification confirmation.
 - **Human Confirmation Requirement:** Required for unclassified or low-confidence documents before downstream extraction.
 - **Deterministic Verification:** MIME structure check & page count bounds validation.
 - **Allowed Downstream Consumers:** Document Extraction Service, Indexing Engine.
@@ -62,7 +63,7 @@ The platform utilizes AI for 14 targeted bid compliance interpretation tasks:
 - **Expected Structured Output:** `OCRExtractedPageSchema` containing text blocks, line tokens, table cells, and bounding boxes `[x0, y0, x1, y1]`.
 - **Validation:** Bounding box coordinate sanity check (within 0–100% normalized canvas boundaries).
 - **Provenance:** Document ULID, page index, bounding box array.
-- **Confidence Handling:** Character-level and word-level OCR confidence metrics. Words < 0.70 confidence highlighted in visual workbench.
+- **Confidence Handling:** Character-level and word-level OCR confidence metrics. Low-confidence words are highlighted in the visual workbench.
 - **Human Confirmation Requirement:** Visual bounding box confirmation required if extraction feeds high-risk financial fields.
 - **Deterministic Verification:** Regex pattern matching on standard key formats (GSTIN checksum, PAN format, IFSC syntax).
 - **Allowed Downstream Consumers:** Structured Field Extraction Pipeline.
@@ -75,7 +76,7 @@ The platform utilizes AI for 14 targeted bid compliance interpretation tasks:
 - **Expected Structured Output:** `ExtractedFieldsEnvelope` containing array of `FieldExtractionItem` (`field_name`, `extracted_value`, `unit`, `confidence`, `page_number`, `bounding_box`).
 - **Validation:** Strict Pydantic schema validation, regex syntax validation, currency/number parsing validation.
 - **Provenance:** Document ULID, page number, bounding box, raw source snippet.
-- **Confidence Handling:** Low confidence (< 0.80) triggers visual highlight on officer workbench.
+- **Confidence Handling:** Task-specific configurable confidence thresholds. Low-confidence fields trigger visual highlights on officer workbench.
 - **Human Confirmation Requirement:** Mandatory officer confirmation for financial figures before deterministic rule evaluation if unverified by external source.
 - **Deterministic Verification:** Mathematical checksum validation (e.g. GSTIN Modulus 36 check, PAN 10-char regex).
 - **Allowed Downstream Consumers:** Compliance Rule Engine candidate inputs, Evidence Ledger builder.
@@ -164,13 +165,13 @@ The platform utilizes AI for 14 targeted bid compliance interpretation tasks:
 - **Preprocessing:** Evidence graph traversal to assemble grounding facts.
 - **AI Operation:** Generates human-readable plain language compliance explanation for procurement officers and audit logs.
 - **Expected Structured Output:** `ComplianceExplanationEnvelope` (`summary_explanation`, `itemized_reasons`, `grounding_evidence_ids`).
-- **Validation:** Grounding verification—every fact in explanation must match an approved `EvidenceRecord` or `VerificationResult` ID.
+- **Validation:** Grounding validation checks that referenced evidence exists, is accessible, and supports the claim according to defined validation rules. Decision-relevant AI-generated factual claims intended for procurement reports must have traceable evidence/provenance. Evidence grounding improves factual reliability but does not mathematically guarantee universal correctness. Unsupported factual claims must be blocked, flagged, or routed for human review according to policy.
 - **Provenance:** Evaluation ULID, Evidence ULIDs, Rule Version ULID.
-- **Confidence Handling:** Hallucination check filter ensures 100% evidence grounding.
+- **Confidence Handling:** Advisory explanation metadata.
 - **Human Confirmation Requirement:** Officer reads explanation; officer may edit explanation for final report.
 - **Deterministic Verification:** Grounding text string alignment with underlying rule output fields.
 - **Allowed Downstream Consumers:** Officer Workbench UI, CVC Audit Report Generator.
-- **Prohibited Downstream Actions:** Including unverified external claims or hallucinated facts in explanation.
+- **Prohibited Downstream Actions:** Including unverified external claims or un-grounded facts in explanation.
 
 ### Use Case 11: Recommendation Generation
 - **Input:** Overall evaluation summary, risk profile, missing document signals, and manual override history.

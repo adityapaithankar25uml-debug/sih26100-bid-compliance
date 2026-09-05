@@ -106,11 +106,11 @@ AI task execution follows a formal deterministic state machine:
 - `NOT_STARTED`: Task initialized in database.
 - `QUEUED`: Enqueued in Celery / Redis task queue.
 - `PROCESSING`: Active model inference underway.
-- `SUCCEEDED`: Inference complete, schema validation passed, confidence $\ge 0.80$.
+- `SUCCEEDED`: Inference complete, schema validation passed, task-specific confidence threshold satisfied.
 - `PARTIAL`: Multi-field extraction partially completed; missing optional fields.
-- `LOW_CONFIDENCE`: Extraction completed but confidence $< 0.80$. Triggers `REQUIRES_HUMAN_REVIEW`.
+- `LOW_CONFIDENCE`: Extraction completed but confidence is below the task-specific policy threshold. Triggers `REQUIRES_HUMAN_REVIEW` or deterministic fallback.
 - `VALIDATION_FAILED`: LLM output failed Pydantic JSON Schema validation. Triggers `REQUIRES_HUMAN_REVIEW`.
-- `FAILED`: Model API error, timeout, or circuit breaker trip. Triggers fallback or `REQUIRES_HUMAN_REVIEW`.
+- `FAILED`: Model API error, timeout, or circuit breaker trip. Triggers Fallback Eligibility Gate evaluation or `REQUIRES_HUMAN_REVIEW`.
 - `REQUIRES_HUMAN_REVIEW`: Task flagged for visual review on Officer Workbench UI.
 - `CANCELLED`: Job revoked by user or system supervisor.
 
@@ -127,7 +127,7 @@ The platform enforces 6 mandatory human review checkpoints where AI outputs requ
 │                          6 MANDATORY HUMAN-IN-THE-LOOP CHECKPOINTS                      │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │ CHECKPOINT 1: Tender Requirement Approval (Admin confirms AI-mined clauses)             │
-│ CHECKPOINT 2: Low-Confidence Extraction Review (Officer verifies fields < 0.80 conf)   │
+│ CHECKPOINT 2: Low-Confidence Extraction Review (Officer verifies fields below policy threshold) │
 │ CHECKPOINT 3: Conflicting Identity Info Review (Officer checks mismatched names/PANs)   │
 │ CHECKPOINT 4: High-Risk Anomaly Signal Review (Officer reviews risk flags)              │
 │ CHECKPOINT 5: Unresolved Govt Verification Review (Officer checks MANUAL_FALLBACK)     │

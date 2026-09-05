@@ -126,7 +126,7 @@ sequenceDiagram
     API->>Gateway: AIGatewayRequest (Task: COMPLIANCE_EXPLANATION)
     Gateway->>Model: Generate Plain Language Explanation (Context: Evidence IDs)
     Model-->>Gateway: Raw Explanation Text Payload
-    Gateway->>Grounder: Verify 100% Evidence Citation Grounding
+    Gateway->>Grounder: Execute Traceable Evidence Grounding Verification
     Grounder-->>API: Grounded Explanation Envelope
     API->>API: Compile CVC Audit PDF Report
     API->>DB: Record Audit Event & Hash Block

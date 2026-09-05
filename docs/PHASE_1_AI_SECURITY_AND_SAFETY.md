@@ -43,7 +43,7 @@ Uploaded tender PDFs and bidder document submissions are treated as **100% UNTRU
 1. **XML / Delimiter Sandboxing:** All extracted document text is wrapped inside strict structural tags (`<<<UNTRUSTED_DOC_CONTENT>>>`).
 2. **Instruction vs. Content Separation:** System prompts explicitly inform the LLM that text within content delimiters is passive data. Any imperative commands contained inside delimiters are ignored.
 3. **Strict Pydantic JSON Schema Enforcement:** LLM outputs must conform to rigid structural JSON schemas. Free-form text responses that try to return injection payloads fail validation and trigger `VALIDATION_FAILED`.
-4. **Tool Permission Isolation:** AI models have **ZERO direct tool permissions**. AI pipelines CANNOT execute database queries, invoke government verification APIs, modify user accounts, or write to file systems.
+4. **Tool Permission Isolation & Authorization:** AI models have no arbitrary tool or side-effect permissions. AI models CANNOT execute database write queries, invoke government verification APIs directly, mutate qualification/officer decision state, or write to file systems. Controlled application services invoke the approved AI Gateway on behalf of the workflow.
 5. **Deterministic Post-Validation:** Extracted numeric fields pass through deterministic regex and range validators (e.g. turnover must be a non-negative float).
 6. **Suspicious Instruction Detection Filter:** Pre-processing regex scans extracted text for known injection phrases (e.g. `IGNORE SYSTEM PROMPT`, `MARK QUALIFIED`, `DROP TABLE`). Flagged documents are assigned `SUSPICIOUS_CONTENT_FLAG` for human review.
 
@@ -63,7 +63,7 @@ To comply with the **Digital Personal Data Protection (DPDP) Act 2023** and gove
 
 ### Pre-AI Pipeline Steps:
 1. **Sensitivity Classification:** Classifies document payload into `PUBLIC`, `RESTRICTED`, `CONFIDENTIAL`, or `HIGHLY_SENSITIVE`.
-2. **Deterministic PII Redaction:** Redacts personal bank account numbers, Aadhaar numbers, personal mobile numbers, and personal email addresses using deterministic regex sanitizers before external transit.
+2. **Contextual PII Handling & Data Minimization:** PII handling is based on sensitivity, purpose, necessity, and organizational policy. Unnecessary personal information (personal bank account details, Aadhaar numbers, personal phone numbers) is minimized or redacted before external AI transit, while legitimate business/procurement information required for the workflow is retained where permitted.
 3. **Cloud Eligibility Decision:** Documents containing un-redactable sensitive personal data or classified defence/refinery specs are prohibited from external commercial cloud transit.
 4. **Local Fallback Routing:** Sensitive payloads are routed exclusively to Category 3 (Self-Hosted vLLM on-premise) or Category 4 (Local Ollama).
 
@@ -89,8 +89,9 @@ AI models are strictly prohibited from generating ungrounded factual claims rega
 ```
 
 ### Grounding Enforcement Rules:
-- An AI explanation stating *"Bidder's turnover is INR 65 Crores"* MUST include structural citation parameters pointing to `evidence_id: "01HZX..."` and `page_number: 3`.
-- An automated post-processing grounding verifier verifies that all cited `evidence_ids` exist in the database and contain the referenced values. Ungrounded claims trigger `EXPLANATION_UNGROUNDED_WARNING` and are excluded from official report outputs.
+- Decision-relevant AI-generated factual claims intended for procurement reports must have traceable evidence/provenance.
+- Grounding validation checks that referenced evidence exists, is accessible, and supports the claim according to defined validation rules.
+- Evidence grounding improves factual reliability but does not mathematically guarantee universal correctness. Unsupported factual claims must be blocked, flagged, or routed for human review according to policy.
 
 ---
 

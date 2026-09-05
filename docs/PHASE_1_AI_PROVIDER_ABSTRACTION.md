@@ -111,13 +111,27 @@ The AI Gateway routes incoming task requests based on a deterministic priority m
 - **`RESTRICTED` / `BIDDER_FINANCIALS`:** Routed to Category 2 (Enterprise Cloud) or Category 3 (Self-Hosted).
 - **`CONFIDENTIAL` / `PII_CONTAINING` / `OFFICER_REMARKS`:** Routed EXCLUSIVELY to Category 3 (Self-Hosted On-Premise) or Category 4 (Local Ollama).
 
-### 4.3 Fallback Chain Priority
-When a primary model fails or experiences an outage:
-1. **Primary Model Outage / Timeout:** Fall back to secondary approved provider within the same or lower sensitivity class.
-2. **External Cloud Network Failure:** Automatically drop down to Category 3 (Self-Hosted vLLM) or Category 4 (Local Ollama).
+### 4.3 Fallback Chain Priority & Safety Gate
+
+Before any candidate model receives a fallback workload, the AI Gateway executes an **Explicit Fallback Eligibility Gate** verifying:
+1. Task capability match (e.g. structured JSON schema support, context window size).
+2. Data sensitivity eligibility (e.g. `CONFIDENTIAL` data CANNOT fallback to Category 1 Cloud models).
+3. Approved provider and model status in platform model registry.
+4. Deployment / data-handling security classification.
+5. Model version and organizational policy eligibility.
+
+Only approved, policy-compliant models may receive the fallback workload. The system MUST NEVER silently route sensitive data to an unapproved external provider. All fallback decisions are logged to audit events.
+
+```
+[Primary Outage] ──> (Fallback Eligibility Gate) ──> [If Approved] ──> Dispatch Secondary Model
+                                                ──> [If Denied]   ──> Trip Circuit Breaker / Manual Review
+```
+
+1. **Primary Model Outage / Timeout:** Fall back to secondary approved provider passing the Fallback Eligibility Gate.
+2. **External Cloud Network Failure:** Fall back to Category 3 (Self-Hosted vLLM) or Category 4 (Local Ollama) if data sensitivity allows.
 3. **Complete AI Provider Failure:** Trip circuit breaker to `OPEN` state and route request to Tier A/D deterministic/manual processing.
 
-> **Quality Protection Rule:** Cost or latency MUST NOT be the sole reason to select a weaker model for high-risk compliance interpretation tasks (e.g. turnover threshold extraction or debarment affidavit evaluation).
+> **Quality & Security Protection Rule:** Cost or latency MUST NOT be the sole reason to select a weaker model for high-risk compliance interpretation tasks. Sensitive payloads MUST NOT bypass data localization rules during fallback.
 
 ---
 

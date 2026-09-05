@@ -108,7 +108,7 @@
 - **Impact:** Medium (Incorrect numeric threshold evaluation).
 - **Likelihood Category:** High.
 - **Mitigation:** Image pre-processing (binarization, 300 DPI deskewing), character-level confidence scoring, and visual bounding box highlight on Officer Workbench.
-- **Detection Mechanism:** Low-confidence extraction alerts ($< 0.80$) and cross-document discrepancy signals.
+- **Detection Mechanism:** Low-confidence extraction alerts (below task policy threshold) and cross-document discrepancy signals.
 - **Fallback Strategy:** Trigger mandatory officer visual bounding box review (Checkpoint 2).
 - **Responsible Role:** Document Admin & Procurement Officer.
 
@@ -152,8 +152,8 @@
 - **Description:** AI explanation module generates a summary sentence containing unverified claims not found in evidence records.
 - **Impact:** High (Misleading audit report narrative).
 - **Likelihood Category:** Low.
-- **Mitigation:** Automated Grounding Verification Engine parses all generated explanation sentences and verifies 100% evidence citation alignment before report export.
-- **Detection Mechanism:** Grounding score $< 1.00$ flag.
+- **Mitigation:** Automated Grounding Verification Engine parses generated explanation sentences and verifies traceable evidence citation alignment before report export.
+- **Detection Mechanism:** Grounding verification check failure flag.
 - **Fallback Strategy:** Strip ungrounded sentences and display itemized rule output facts only.
 - **Responsible Role:** AI Quality Lead.
 

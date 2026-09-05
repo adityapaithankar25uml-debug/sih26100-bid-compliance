@@ -262,19 +262,18 @@
   2. Strict Non-Authoritative Axiom: `AI INTERPRETS → AUTHORIZED SOURCES VERIFY → RULES EVALUATE → EVIDENCE PROVES → HUMAN APPROVES`, enforced across a 4-Tier Responsibility Boundary Matrix.
 * **Decision:** Adopt **Non-Authoritative AI Axiom & 4-Tier Responsibility Boundary Matrix**.
 * **Reason:** Preserves legal accountability and CVC compliance. Final qualification decisions remain strictly attributable to human Procurement Officers; compliance evaluations remain 100% deterministic.
-* **Consequences:** AI outputs are tagged `[AI PROPOSAL - ADVISORY ONLY]` and CANNOT mutate evaluation statuses directly.
 * **Rejected Alternatives:** Autonomous AI qualification decisions (rejected due to violation of procurement law and CVC guidelines).
 
 ---
 
-### ADR-028: Mandatory Evidence Citation & 100% Grounding Verification for Explanations
-* **Context:** Ensuring generated plain-language explanations in officer workbenches and CVC audit reports do not contain hallucinated factual claims.
+### ADR-028: Mandatory Evidence Citation & Grounding Verification for Explanations
+* **Context:** Ensuring generated plain-language explanations in officer workbenches and CVC audit reports have traceable evidence and do not contain un-grounded factual claims.
 * **Options Considered:**
   1. Free-form text explanation generation without strict evidence linkage.
-  2. Mandatory structural evidence citation (`evidence_id`, `page_number`, `bounding_box`) + Automated Grounding Verification Engine checking 100% citation validity before report export.
-* **Decision:** Implement **Mandatory Evidence Citation & 100% Grounding Verification**.
-* **Reason:** Eliminates hallucinated facts in official audit narratives. Every assertion must map directly to an approved `EvidenceRecord` or `VerificationResult` in the database.
-* **Consequences:** Explanations failing grounding checks are rejected and replaced with structured rule output facts.
+  2. Mandatory structural evidence citation (`evidence_id`, `page_number`, `bounding_box`) + Automated Grounding Verification Engine checking evidence citation validity before report export.
+* **Decision:** Implement **Mandatory Evidence Citation & Traceable Grounding Verification**.
+* **Reason:** Ensures decision-relevant AI-generated factual claims intended for procurement reports have traceable evidence/provenance. Grounding validation checks that referenced evidence exists, is accessible, and supports the claim according to defined validation rules.
+* **Consequences:** Explanations failing grounding checks are rejected, flagged, or replaced with structured rule output facts.
 * **Rejected Alternatives:** Unchecked free-form LLM explanations (rejected due to hallucination risks).
 
 ---
@@ -291,12 +290,12 @@
 
 ---
 
-### ADR-030: Capability-Based & Sensitivity-Aware Model Routing Strategy
-* **Context:** Routing AI task workloads efficiently across multiple models without compromising high-risk compliance quality or leaking sensitive data.
+### ADR-030: Capability-Based, Sensitivity-Aware Model Routing & Fallback Safety Gate Strategy
+* **Context:** Routing AI task workloads efficiently across multiple models without compromising high-risk compliance quality or leaking sensitive data during primary or fallback execution.
 * **Options Considered:**
-  1. Routing all requests to a single commercial cloud model based on lowest cost/latency.
-  2. Capability-based and sensitivity-aware routing priority matrix (matching task complexity, data sensitivity classification, and fallback priority).
-* **Decision:** Implement **Capability-Based & Sensitivity-Aware Model Routing Strategy**.
-* **Reason:** Ensures sensitive PII data is processed exclusively on self-hosted or local models, while reserving high-reasoning models for complex tender clause mining regardless of cost.
-* **Consequences:** AI Gateway dynamically evaluates capability, sensitivity, and availability headers before dispatching task requests.
-* **Rejected Alternatives:** Cost-only routing (rejected due to risk of selecting weak models for high-risk compliance evaluation).
+  1. Routing all requests to a single commercial cloud model based on lowest cost/latency or un-gated fallback routing.
+  2. Capability-based and sensitivity-aware routing priority matrix + Explicit Fallback Eligibility Gate (verifying task capability, data sensitivity eligibility, approved status, deployment classification, and policy compliance).
+* **Decision:** Implement **Capability-Based, Sensitivity-Aware Model Routing & Fallback Safety Gate Strategy**.
+* **Reason:** Ensures sensitive PII data is processed exclusively on self-hosted or local models, while reserving high-reasoning models for complex tender clause mining regardless of cost. Explicit Fallback Eligibility Gate prevents sensitive data from being silently routed to unapproved external providers during cloud outages.
+* **Consequences:** AI Gateway dynamically evaluates capability, sensitivity, and availability headers before dispatching primary or fallback task requests.
+* **Rejected Alternatives:** Cost-only routing or un-gated fallback (rejected due to risk of selecting weak models or leaking sensitive data during outages).

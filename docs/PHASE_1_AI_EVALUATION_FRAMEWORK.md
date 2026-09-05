@@ -45,27 +45,27 @@ $$\text{Acc}_{\text{field}} = \frac{\text{Count of Exactly Matched Extracted Val
 
 ### 2.3 Bounding Box Intersection over Union ($\text{IoU}$)
 $$\text{IoU} = \frac{\text{Area}(\text{Box}_{\text{predicted}} \cap \text{Box}_{\text{ground\_truth}})}{\text{Area}(\text{Box}_{\text{predicted}} \cup \text{Box}_{\text{ground\_truth}})}$$
-- Target: $\text{IoU} \ge 0.85$ for visual highlight bounding box rendering.
+- Bounding-box quality will be evaluated using IoU where applicable. Acceptance thresholds will be established from representative benchmark data, document types, and task requirements during model evaluation.
 
 ### 2.4 Groundedness Metric ($\text{Groundedness}$)
 $$\text{Groundedness} = \frac{\text{Count of AI Statements Supported by Verified Evidence}}{\text{Total Generated Factual Statements in Explanation}}$$
-- Target: $\text{Groundedness} = 1.00$ (100% evidence-grounded requirement for report export).
+- Decision-relevant AI-generated factual claims intended for procurement reports must have traceable evidence/provenance. Grounding validation checks that referenced evidence exists, is accessible, and supports the claim according to defined validation rules. Evidence grounding improves factual reliability but does not mathematically guarantee universal correctness. Unsupported factual claims must be blocked, flagged, or routed for human review according to policy.
 
 ---
 
-## 3. False-Positive vs. False-Negative Prioritized Trade-Off Model
+## 3. Task-Specific Precision/Recall Trade-Off Model
 
-In procurement compliance, the operational impact of errors varies by task type:
+Precision/recall trade-offs are task-specific and must reflect the consequences of false positives and false negatives. High-risk financial, identity, eligibility, debarment, and compliance fields require validation against source evidence and deterministic checks where applicable.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                    TASK-SPECIFIC ERROR TRADE-OFF MODEL                                  │
 ├───────────────────────────────────────┬─────────────────────────────────────────────────┤
-│ TASK GROUP A: Financial & Eligibility  │ PRIORITIZE HIGH RECALL (Minimize False Negatives)│
-│ (Turnover, Net Worth, Experience)     │ • Failing to detect a non-compliant bidder is   │
-│                                       │   a severe procurement compliance failure.       │
+│ TASK GROUP A: Financial & Eligibility  │ REFLECT CONSEQUENCES OF FALSE NEGATIVES          │
+│ (Turnover, Net Worth, Experience)     │ • Requires deterministic validation and source   │
+│                                       │   evidence checks to prevent missed failures.   │
 ├───────────────────────────────────────┼─────────────────────────────────────────────────┤
-│ TASK GROUP B: Debarment & Fraud Flags │ PRIORITIZE HIGH PRECISION (Min False Positives) │
+│ TASK GROUP B: Debarment & Fraud Flags │ REFLECT CONSEQUENCES OF FALSE POSITIVES         │
 │ (Blacklisting, Integrity Anomaly)     │ • Falsely accusing a vendor of fraud causes legal│
 │                                       │   harm; high precision + human review mandatory.│
 └───────────────────────────────────────┴─────────────────────────────────────────────────┘
@@ -79,5 +79,5 @@ Before any model upgrade or prompt version change is deployed to production:
 
 1. **Regression Benchmark Run:** The new model/prompt configuration is executed against all 5 benchmark datasets (`DS-BENCH-01` through `05`).
 2. **Non-Degradation Threshold:** The overall $F_1$ score and field accuracy must not degrade compared to the active production baseline.
-3. **100% Injection Block Mandate:** The model/prompt configuration MUST achieve a 100% block rate against `DS-BENCH-05` prompt injection vectors. Any injection leak blocks deployment.
+3. **Prompt-Injection Suite Release Gate:** The critical prompt-injection regression suite (`DS-BENCH-05`) should have zero successful attacks at release-gate evaluation time for the defined test corpus. Passing a finite benchmark does not imply universal immunity to future prompt-injection techniques.
 4. **Audit Trail Persistence:** Evaluation run metrics, prompt IDs, and timestamp hashes are recorded in the model governance ledger.
