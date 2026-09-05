@@ -2,11 +2,11 @@
 
 ## SIH 26100: AI-Powered Integrated Bid Compliance Verification Platform for GeM Procurement
 
-**Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
-**Phase:** 1 — Architecture & Technical Design  
-**Document ID:** SIH26100-ARCH-005  
-**Version:** 1.3.0  
-**Date:** 2026-09-05  
+**Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)
+**Phase:** 1 — Architecture & Technical Design
+**Document ID:** SIH26100-ARCH-005
+**Version:** 1.3.0
+**Date:** 2026-09-05
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
 ---
@@ -1217,9 +1217,50 @@
 * **Consequences:** Client telemetry payloads are scrubbed of PII before export; correlation IDs link browser requests to backend traces.
 * **Rejected Alternatives:** Using client telemetry as compliance evidence.
 
+---
 
+### ADR-108: Phase 1 Cross-Task Architecture Governance & Integration Framework
+* **Context:** Integrating Tasks 1–11 into a unified, coherent system architecture across domain models, APIs, workflows, security, and UI layers.
+* **Options Considered:**
+  1. Allowing minor task-level discrepancies to resolve ad-hoc during coding.
+  2. Formal cross-task integration governance with explicit inconsistency registration and unified status taxonomies.
+* **Decision:** Implement **Phase 1 Cross-Task Architecture Governance & Integration Framework**.
+* **Reason:** Ensures complete architectural consistency across domain models, APIs, security boundaries, and UI presentation without altering frozen task baselines.
+* **Consequences:** Establishes `docs/PHASE_1_ARCHITECTURAL_INCONSISTENCY_REGISTER.md` as authoritative source for terminology alignment; mandates strict adherence to unified status taxonomies.
+* **Rejected Alternatives:** Ungoverned ad-hoc resolution during implementation.
 
+---
 
+### ADR-109: End-to-End Evidence Traceability & Provenance Verification Framework
+* **Context:** Guaranteeing that every compliance result and officer decision is traceable from requirement down to raw source document bounding box, government API response, and audit log.
+* **Options Considered:**
+  1. Loose document mapping based on file names.
+  2. End-to-End Evidence Traceability Framework linking Requirement -> Rule -> Fact -> Verification -> Evidence -> Evaluation -> Decision -> Audit Hash Chain.
+* **Decision:** Implement **End-to-End Evidence Traceability & Provenance Verification Framework**.
+* **Reason:** Satisfies strict CVC public procurement transparency and auditability standards.
+* **Consequences:** Every compliance decision maintains an unbroken, verifiable audit chain.
+* **Rejected Alternatives:** Unlinked evaluation summaries.
 
+---
 
+### ADR-110: Architectural Invariant Governance & Non-Authoritative AI Boundary
+* **Context:** Enforcing non-negotiable architectural boundaries across Phase 2 implementation teams.
+* **Options Considered:**
+  1. Informal code review guidelines.
+  2. Formal Architectural Invariant Governance codifying 10 non-negotiable invariants (including AI non-authoritative, MISSING_EVIDENCE != FAIL, Govt technical failure != non-compliance, and Backend-authoritative AuthZ).
+* **Decision:** Implement **Architectural Invariant Governance & Non-Authoritative AI Boundary**.
+* **Reason:** Guarantees that AI remains advisory, security remains server-side authoritative, and bidders are protected from false disqualification due to external technical outages.
+* **Consequences:** Automated CI pipeline rules enforce invariant checks on all Phase 2 code PRs.
+* **Rejected Alternatives:** Informal code guidelines without explicit invariant definitions.
 
+---
+
+### ADR-111: Phase 1 Completion & Phase 2 Implementation Boundary Governance
+* **Context:** Formally marking Phase 1 Architecture & Design complete and defining transition rules for Phase 2 Implementation.
+* **Options Considered:**
+  1. Overlapping Phase 1 design with Phase 2 implementation.
+  2. Formal Phase 1 Design Freeze with zero implementation code in Phase 1, establishing clear prerequisites for Phase 2.
+* **Decision:** Implement **Phase 1 Completion & Phase 2 Implementation Boundary Governance**.
+* **Reason:** Preserves structural architectural integrity and prevents prematurely writing un-architected implementation code.
+* **Consequences:** Phase 1 ends with Task 12 design review; Phase 2 starts clean from Task 12 baselines. There is no Task 13 in Phase 1.
+* **Rejected Alternatives:** Premature implementation during Phase 1.
