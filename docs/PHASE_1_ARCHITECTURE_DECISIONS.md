@@ -140,7 +140,7 @@
 ---
 
 ### ADR-016: Tender, Rule, and Policy Temporal Versioning Architecture
-* **Context:** Historical procurement evaluations must remain 100% explainable and reproducible over time.
+* **Context:** Historical procurement evaluations must remain explainable and reproducible over time.
 * **Decision:** Adopt **Five-Tier Temporal Versioning Architecture**.
 
 ---
@@ -394,4 +394,102 @@
 * **Reason:** Ensures business continuity during government portal outages or for sources lacking public APIs (e.g., debarment lists, EPFO/ESIC). Preserves complete tamper-evident auditability.
 * **Consequences:** Manual fallback actions produce standard evidence records tagged with `MANUAL_FALLBACK` and linked to `OfficerDecision` audit blocks.
 * **Rejected Alternatives:** Un-audited manual overrides or halting procurement evaluation on API failure (rejected due to operational unfeasibility).
+
+---
+
+### ADR-039: Deterministic Rules Engine Architecture & Non-Authoritative AI Boundary
+* **Context:** Evaluating bid compliance against complex tender clauses and regulatory policies without allowing unexplainable, non-deterministic LLM inferences to make pass/fail determinations.
+* **Options Considered:**
+  1. Prompting LLMs to evaluate tender compliance directly and output pass/fail decisions.
+  2. Isolated `ComplianceEngineOrchestrator` executing type-safe deterministic rule ASTs on structured facts (`NormalizedFact`), with AI models restricted to pre-evaluation document extraction and post-evaluation explanation rendering.
+* **Decision:** Implement **Deterministic Rules Engine Architecture & Non-Authoritative AI Boundary**.
+* **Reason:** Guarantees deterministic, explainable, and reproducible compliance evaluations in strict compliance with CVC vigilance guidelines and public procurement law.
+* **Consequences:** Compliance rules never invoke LLMs during evaluation. AI models possess zero authority to make pass/fail or qualification determinations.
+* **Rejected Alternatives:** Autonomous AI pass/fail evaluation (rejected due to hallucination risks and violation of legal accountability).
+
+---
+
+### ADR-040: Safe Non-Executable AST Expression Architecture (Zero eval/exec)
+* **Context:** Representing complex mathematical, threshold, range, and set-membership rule logic safely without introducing dynamic code execution vulnerabilities.
+* **Options Considered:**
+  1. Executing dynamic Python string expressions using `eval()`, `exec()`, or custom code interpreters.
+  2. Safe, structural JSON Abstract Syntax Tree (AST) model evaluated via a closed set of 15 type-safe tree traversal operators (Logical, Relational, String, Chronological).
+* **Decision:** Implement **Safe Non-Executable AST Expression Architecture**.
+* **Reason:** Eliminates remote code execution (RCE) and code injection vulnerabilities. Guarantees that rules can be safely validated, versioned, and executed in a sandboxed environment with deployment-configurable resource bounds.
+* **Consequences:** All rule conditions must be defined as schema-validated AST JSON structures. Arbitrary Python code execution is strictly prohibited.
+* **Rejected Alternatives:** Dynamic string evaluation or custom script execution (rejected due to severe security vulnerabilities).
+
+---
+
+### ADR-041: Immutable Policy Versioning & Dynamic Threshold Binding (PolicyVersion)
+* **Context:** Managing regulatory procurement thresholds (e.g., local content percentages, MSME exemptions, turnover limits) without hardcoding values in application code or overwriting historical evaluation baselines.
+* **Options Considered:**
+  1. Hardcoding statutory numbers directly into Python rule classes or database records.
+  2. Immutable `PolicyVersion` entity model with versioned parameter maps, formal approval lifecycles (`DRAFT` $\rightarrow$ `ACTIVE` $\rightarrow$ `SUPERSEDED`), and temporal binding to tender publication and corrigendum dates.
+* **Decision:** Implement **Immutable Policy Versioning & Dynamic Threshold Binding**.
+* **Reason:** Ensures zero hardcoded policy numbers in code. Supports historical evaluation reproducibility during vigilance audits, as historical evaluations remain permanently anchored to their bound tender and policy versions.
+* **Consequences:** Operational policy parameter updates require issuing a new SemVer `PolicyVersion`. Hardcoding numbers in rule code is forbidden.
+* **Rejected Alternatives:** Hardcoded threshold constants or in-place policy parameter overwrites (rejected due to audit non-reproducibility).
+
+---
+
+### ADR-042: Evidence-First Fact Model & Strict Status Separation (MISSING ≠ FAIL)
+* **Context:** Preventing missing bidder documents, unverified government statuses, or network transport failures from being incorrectly classified as compliance failures or triggering automated disqualifications.
+* **Options Considered:**
+  1. Collapsing missing facts or unverified statuses into a generic `FAIL` output.
+  2. Canonical `NormalizedFact` model encapsulating 10 fact sources and 9 explicit status states, enforcing the axiom that missing data yields `MISSING_EVIDENCE` $\rightarrow$ `REQUIRES_HUMAN_REVIEW`, never `FAIL`.
+* **Decision:** Implement **Evidence-First Fact Model & Strict Status Separation**.
+* **Reason:** Protects bidder rights and procurement fairness. A `FAIL` status requires an explicit, verified false condition supported by immutable `EvidenceRecord` hashes. Missing data transitions to officer review.
+* **Consequences:** Missing facts, stale evidence, or transport failures can **NEVER** directly trigger automated bidder disqualification.
+* **Rejected Alternatives:** Misclassifying missing evidence as compliance failure (rejected due to breach of legal procurement principles).
+
+---
+
+### ADR-043: Machine-Readable Evaluation Trace & Traceable Grounded Explanations
+* **Context:** Generating plain-language compliance explanations for procurement officers and CVC audit reports while ensuring traceable factual grounding.
+* **Options Considered:**
+  1. Free-form LLM explanation generation based on prompt summaries.
+  2. Machine-readable `EvaluationTrace` containing step-by-step AST execution logs, input fact values, policy parameter references, and evidence SHA-256 hashes, rendered into explanations via pre-approved template patterns.
+* **Decision:** Implement **Machine-Readable Evaluation Trace & Traceable Grounded Explanations**.
+* **Reason:** Eliminates hallucinated or un-grounded explanatory statements in procurement reports. Ensures every statement is mathematically traceable to underlying raw documents and evidence records.
+* **Consequences:** Explanations failing grounding hash checks are rejected and replaced with structured rule fact summaries.
+* **Rejected Alternatives:** Free-form LLM explanations without deterministic trace linkage (rejected due to hallucination risks).
+
+---
+
+### ADR-044: Submission Qualification Aggregation & Disqualifying-If-Proven Severity Boundary
+* **Context:** Aggregating individual requirement evaluations into a submission-level `QualificationOutcome` (`QUALIFIED`, `NOT_QUALIFIED`, `PENDING_REVIEW`) based on requirement severity classes.
+* **Options Considered:**
+  1. Simple binary ALL-PASS aggregation where any single missing item or failure disqualifies the bidder.
+  2. Severity-weighted aggregation matrix categorizing rules into `DISQUALIFYING_IF_PROVEN`, `MATERIAL_REVIEW`, `NON_MATERIAL_REVIEW`, and `INFORMATIONAL`, ensuring disqualification occurs ONLY when a disqualifying violation is proven with verified evidence.
+* **Decision:** Implement **Submission Qualification Aggregation & Disqualifying-If-Proven Severity Boundary**.
+* **Reason:** Aligns platform behavior with CVC guidelines and Indian public procurement law. Distinguishes between proven disqualifying violations and items requiring officer clarification or minor non-material reviews.
+* **Consequences:** Unverified or ambiguous requirements yield `PENDING_REVIEW`, preserving bidder eligibility for human officer evaluation.
+* **Rejected Alternatives:** Binary ALL-PASS aggregation (rejected due to premature disqualification risks on technical or missing data items).
+
+---
+
+### ADR-045: Rule Testing, Invariant Validation & DAG Cycle Detection
+* **Context:** Ensuring rule definitions are mathematically sound, free from circular requirement dependencies, and robust against boundary edge cases before activation.
+* **Options Considered:**
+  1. Manual inspection of rule definitions during deployment.
+  2. Automated Rule Test Suite verifying standard test case categories (positive, negative, boundary, missing-data, stale-data, conflicting-data, exempt, invalid) + Static Tarjan DAG cycle detection on requirement dependency graphs.
+* **Decision:** Implement **Rule Testing, Invariant Validation & DAG Cycle Detection**.
+* **Reason:** Prevents evaluation deadlocks, stack overflows, and logic bugs in production tender processing. Enforces core mathematical and architectural engine invariants.
+* **Consequences:** Rules failing applicable test suite execution or creating dependency cycles are rejected during administrative review.
+* **Rejected Alternatives:** Un-validated rule activation (rejected due to risk of runtime evaluation failures during live tenders).
+
+---
+
+### ADR-046: Policy-Configurable Human Review Gate & Auditable Non-Mutating Manual Overrides
+* **Context:** Handling material discrepancies, rule conflicts, or procurement officer overrides without corrupting historical deterministic evaluation records.
+* **Options Considered:**
+  1. Allowing procurement officers to edit database evaluation records in-place.
+  2. Policy-Configurable Human Review Gate escalating ambiguous outcomes to `REQUIRES_HUMAN_REVIEW` + Co-existing `ManualOverride` entity model recording signed officer rationale, evidence attachments, and audit hash-chain blocks, with four-eyes review governed by policy configuration.
+* **Decision:** Implement **Policy-Configurable Human Review Gate & Auditable Non-Mutating Manual Overrides**.
+* **Reason:** Preserves legal auditability. The historical deterministic rule output remains locked and un-mutated, while the officer's manual override co-exists as an auditable decision block in the hash-chain. Four-eyes review is policy-configurable for designated high-risk actions.
+* **Consequences:** In-place database edits of evaluation records are strictly forbidden. All human overrides require explicit officer authentication, justification notes, and audit logging. Four-eyes dual control is enforced where enabled by policy.
+* **Rejected Alternatives:** In-place evaluation record edits or un-audited manual overrides (rejected due to breach of legal auditability).
+
+
 

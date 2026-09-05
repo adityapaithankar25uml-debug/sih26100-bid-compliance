@@ -1,0 +1,102 @@
+# Phase 1 — Qualification Outcome Aggregation Architecture
+
+## Overview
+
+The **Qualification Outcome Aggregation Architecture** defines how the **SIH26100 Bid Compliance Verification Platform** aggregates requirement-level `ComplianceEvaluation` results into a submission-level `QualificationOutcome`.
+
+This architecture enforces strict rules governing requirement severity, exemption mechanics, and human decision boundaries.
+
+---
+
+## 1. Requirement Severity Taxonomy
+
+Every `ComplianceRule` is assigned a severity class governing how a negative evaluation impacts the overall submission qualification:
+
+| Severity Class Key | Class Name | Impact on Submission Qualification Outcome |
+| :--- | :--- | :--- |
+| **`DISQUALIFYING_IF_PROVEN`** | Disqualifying Violation | Mandatory requirement. A proven `FAIL` status (supported by verified evidence) results in `NOT_QUALIFIED`. |
+| **`MATERIAL_REVIEW`** | Material Deficiency | Major requirement. Missing evidence, unverified status, or ambiguity results in `PENDING_REVIEW`. |
+| **`NON_MATERIAL_REVIEW`** | Minor Deficiency | Secondary requirement. Discrepancy logged as an informational flag for officer review; does not halt qualification. |
+| **`INFORMATIONAL`** | Informational Signal | Purely informational fact check; zero impact on qualification outcome. |
+
+> [!CRITICAL]
+> **"DISQUALIFYING IF PROVEN" REQUIREMENT:**
+> The `DISQUALIFYING_IF_PROVEN` class means a bidder is disqualified **ONLY when a negative condition is proven with verified evidence** (e.g., active debarment listing confirmed by government source). Missing evidence, transport timeouts, or unverified facts must **NEVER** trigger `NOT_QUALIFIED`; they transition the outcome to `PENDING_REVIEW`.
+
+---
+
+## 2. Aggregation Logic & State Matrix
+
+The `QualificationOutcomeAggregator` evaluates the set of all `ComplianceEvaluation` records for a submission:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ COMPLIANCE EVALUATIONS FOR SUBMISSION                  │
+├────────────────────────────────────────────────────────┤
+│ Req 1 (DISQUALIFYING): PASS                            │
+│ Req 2 (DISQUALIFYING): PASS                            │
+│ Req 3 (MATERIAL): REQUIRES_HUMAN_REVIEW                │
+│ Req 4 (MSME Exemption): NOT_APPLICABLE                 │
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ QUALIFICATION OUTCOME AGGREGATOR                       │
+├────────────────────────────────────────────────────────┤
+│ Evaluates Matrix Rules across Severity & Status        │
+└────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ QualificationOutcome: PENDING_REVIEW                   │
+└────────────────────────────────────────────────────────┘
+```
+
+### 2.1 Aggregation Matrix Rules
+
+| Condition Across Requirement Evaluations | Aggregate Qualification Outcome |
+| :--- | :--- |
+| Any `DISQUALIFYING_IF_PROVEN` requirement has status `FAIL` | **`NOT_QUALIFIED`** |
+| Any `DISQUALIFYING_IF_PROVEN` or `MATERIAL_REVIEW` requirement has status `REQUIRES_HUMAN_REVIEW`, `MISSING_EVIDENCE`, `NOT_VERIFIED`, or `CONFLICTING` | **`PENDING_REVIEW`** |
+| All mandatory requirements evaluate to `PASS` or `NOT_APPLICABLE`, with minor `NON_MATERIAL_REVIEW` flags | **`CONDITIONALLY_QUALIFIED`** |
+| All mandatory and material requirements evaluate to `PASS` or `NOT_APPLICABLE` | **`QUALIFIED`** |
+| System error prevents evaluation completion | **`INDETERMINATE`** |
+
+---
+
+## 3. Generic Exemption Architecture (MSME / Startup / NSIC)
+
+Statutory exemptions (e.g., EMD fee waiver for MSEs under Public Procurement Policy, turnover relaxation for DPIIT-recognized startups) are handled via generic applicability conditions:
+
+```
+[Requirement Evaluation Initiated]
+               │
+               ▼
+┌────────────────────────────────────────────────────────┐
+│ APPLICABILITY ENGINE                                   │
+├────────────────────────────────────────────────────────┤
+│ Evaluates `applicability_condition_ast`                │
+│ (e.g., "Is Bidder MSE Micro/Small?")                   │
+└────────────────────────────────────────────────────────┘
+               │
+               ├──────────────────────────┐
+               ▼ (Applicable)             ▼ (Exempt / Not Applicable)
+┌───────────────────────────┐   ┌───────────────────────────┐
+│ Execute Requirement Rule  │   │ Mark Evaluation Status    │
+│ (Evaluate Fact AST)       │   │ `NOT_APPLICABLE` (Exempt) │
+└───────────────────────────┘   └───────────────────────────┘
+```
+
+By decoupling exemptions into the applicability engine, procurement policies can grant statutory relaxations without modifying core requirement definitions.
+
+---
+
+## 4. Human Decision Boundary & Overrides
+
+The `QualificationOutcome` generated by the engine is a **deterministic summary recommendation**. Final legal authority remains with the Procurement Officer:
+
+```
+[Deterministic QualificationOutcome] ──► [Procurement Officer Workbench] ──► [Officer Decision (Approved / Overridden)]
+```
+
+If an officer overrides an outcome (e.g., accepting alternative evidence for a `PENDING_REVIEW` submission), the system creates an immutable `ManualOverride` record linked to an `OfficerDecision` audit block without altering the historical deterministic evaluation record.
