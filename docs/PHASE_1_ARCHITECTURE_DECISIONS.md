@@ -299,3 +299,99 @@
 * **Reason:** Ensures sensitive PII data is processed exclusively on self-hosted or local models, while reserving high-reasoning models for complex tender clause mining regardless of cost. Explicit Fallback Eligibility Gate prevents sensitive data from being silently routed to unapproved external providers during cloud outages.
 * **Consequences:** AI Gateway dynamically evaluates capability, sensitivity, and availability headers before dispatching primary or fallback task requests.
 * **Rejected Alternatives:** Cost-only routing or un-gated fallback (rejected due to risk of selecting weak models or leaking sensitive data during outages).
+
+---
+
+### ADR-031: Government Integration Adapter Pattern & Provider Abstraction
+* **Context:** Abstracting diverse external government API protocols, schemas, and portals (GSTN, Udyam, PAN, MCA, DigiLocker, etc.) into a unified internal verification contract without leaking vendor details to downstream compliance engines.
+* **Options Considered:**
+  1. Direct, ad-hoc HTTP/SOAP API calls from core compliance services to external government endpoints.
+  2. Isolated `BaseGovernmentAdapter` pattern with standardized `VerificationRequestPayload` and `NormalizedVerificationResponse` data contracts, routed exclusively through a central `GovernmentVerificationOrchestrator`.
+* **Decision:** Implement **Government Integration Adapter Pattern & Provider Abstraction**.
+* **Reason:** Isolates external transport, payload parsing, and authentication mechanics. Downstream compliance rules evaluate consistent normalized structures regardless of whether data comes from API Setu, an official portal, a synthetic mock, or a manual officer verification.
+* **Consequences:** All government integrations must implement `BaseGovernmentAdapter`. AI services are strictly prohibited from invoking adapters directly.
+* **Rejected Alternatives:** Un-abstracted direct API calls (rejected due to tight coupling and risk of breaking downstream rules on vendor schema updates).
+
+---
+
+### ADR-032: Strict Qualification of Government API Availability & Authorized Source Principle
+* **Context:** Preventing false or assumptive claims regarding public API access for Indian government portals (GST, MCA, Udyam, EPFO, ESIC, Debarment registries) in documentation and software architecture.
+* **Options Considered:**
+  1. Claiming direct, unauthenticated, or universal public API integration across all government portals.
+  2. Mandatory architectural qualification standard: *"The system supports integration through an authorized or approved source or integration mechanism, subject to onboarding, credentials, permissions, availability, and applicable policy."*
+* **Decision:** Adopt **Strict Qualification of Government API Availability & Authorized Source Principle**.
+* **Reason:** Ensures absolute honesty regarding public procurement API realities. Clearly distinguishes between confirmed public APIs (e.g., API Setu endpoints, DigiLocker), conditional partner APIs, unverified portals, synthetic mocks, and manual fallback workflows.
+* **Rejected Alternatives:** Unqualified claims of universal live API integration (rejected due to inaccuracy and breach of project governance rules).
+
+---
+
+### ADR-033: Canonical Normalized Verification Result Model & Identity Comparison Engine
+* **Context:** Normalizing external verification responses into a common domain structure and performing multi-tier field comparison (exact, normalized, alias, mismatch) without relying on ungrounded AI matching.
+* **Options Considered:**
+  1. Storing raw vendor JSON responses directly in compliance evaluation records or using fuzzy LLM matching for legal identity checks.
+  2. Canonical `GovernmentVerificationResult` model with deterministic string normalization, field comparison scoring, and policy-controlled identity matching criteria where similarity scores serve as supporting signals and material identity ambiguity triggers human officer review.
+* **Decision:** Implement **Canonical Normalized Verification Result Model & Identity Comparison Engine**.
+* **Reason:** Prevents schema divergence from breaking compliance evaluations. Guarantees that legal entity matching relies on deterministic normalization rules (`Pvt Ltd` $\rightarrow$ `Private Limited`) and approved policy criteria rather than opaque LLM inferences or static numerical thresholds.
+* **Consequences:** Material identity ambiguity or field mismatches automatically transition to `AMBIGUOUS_IDENTITY` and set `requires_human_review = True`.
+* **Rejected Alternatives:** Direct storage of un-normalized vendor JSON, static universal similarity thresholds, or autonomous LLM identity matching (rejected due to auditability and legal risks).
+
+---
+
+### ADR-034: Absolute Separation of Technical Transport Status from Business Verification Result
+* **Context:** Preventing transient network timeouts, HTTP 5xx errors, rate limits, or portal outages from being incorrectly treated as compliance failures or leading to automated bidder disqualifications.
+* **Options Considered:**
+  1. Collapsing all failed adapter attempts into a generic `FAIL` status.
+  2. Strict architectural separation between **Technical Transport Status** (`TIMEOUT`, `HTTP_500_ERROR`, `RATE_LIMITED`) and **Business Verification Result** (`VERIFIED`, `NOT_VERIFIED`, `RECORD_NOT_FOUND`, `MISMATCH`).
+* **Decision:** Implement **Absolute Separation of Technical Transport Status from Business Verification Result**.
+* **Reason:** Protects bidder rights and procurement fairness. Technical transport failures transition the verification request to `REQUIRES_MANUAL_VERIFICATION`, preserving bidder eligibility while triggering officer workflow fallback.
+* **Consequences:** Technical transport failure can **NEVER** directly trigger automated bidder disqualification.
+* **Rejected Alternatives:** Collapsing transport failures into compliance failures (rejected due to severe violation of legal procurement principles).
+
+---
+
+### ADR-035: Quad-Operating Mode Strategy (LIVE, SANDBOX, MOCK, MANUAL_FALLBACK)
+* **Context:** Supporting seamless operational transitions between live G2G production environments, official developer sandboxes, hackathon prototype demonstrations, and manual portal verification fallback.
+* **Options Considered:**
+  1. Single binary production vs. non-production toggle.
+  2. Four explicit operating modes (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL_FALLBACK`) tracked per verification request and visually stamped on all UI components and audit records.
+* **Decision:** Implement **Quad-Operating Mode Strategy**.
+* **Reason:** Allows SIH 2026 hackathon prototype evaluation using deterministic synthetic mocks while maintaining an auditable production-ready architecture for live G2G onboarding and manual fallback.
+* **Consequences:** UI components display prominent color-coded badges indicating the active operating mode for every verification record.
+* **Rejected Alternatives:** Unstamped synthetic mock data (rejected due to risk of confusing test data with real government proof).
+
+---
+
+### ADR-036: Evidence-First Provenance Architecture & Multi-Source Conflict Resolution
+* **Context:** Ensuring every government verification generates a tamper-evident `EvidenceRecord` linked to raw response hashes and resolving multi-source data conflicts (e.g., GST Active vs. Debarment Listed) without overwriting evidence.
+* **Options Considered:**
+  1. Overwriting previous verification records or allowing AI to resolve conflicting government evidence autonomously.
+  2. Immutable `EvidenceRecord` generation with SHA-256 payload hashing, complete provenance envelopes, dual-evidence preservation, and mandatory human officer escalation for material conflicts.
+* **Decision:** Implement **Evidence-First Provenance Architecture & Multi-Source Conflict Resolution**.
+* **Reason:** Ensures complete audit reproducibility for CVC vigilance checks. Preserves contradictory source evidence in full without silent overwrites, ensuring human officers make informed final rulings.
+* **Consequences:** All verification records are immutable and hashed into the system's tamper-evident audit hash-chain.
+* **Rejected Alternatives:** Overwriting historical evidence or autonomous AI conflict resolution (rejected due to breach of legal auditability).
+
+---
+
+### ADR-037: Scoped Government Credential Isolation & Secret Management Boundary
+* **Context:** Securing G2G mTLS certificates, API keys, and OAuth client secrets used for external government API authentication.
+* **Options Considered:**
+  1. Storing API keys or credentials in application configuration files, environment files committed to Git, or Postgres database tables.
+  2. Scoped Credential Isolation Boundary storing zero secrets in code/git/DB, utilizing external secret stores (AWS Secrets Manager / Vault) with dynamic runtime environment injection and KMS encryption.
+* **Decision:** Implement **Scoped Government Credential Isolation & Secret Management Boundary**.
+* **Reason:** Eliminates credential leakage risks and meets government G2G security onboarding requirements.
+* **Consequences:** Secrets are never logged, written to disk, or exposed in API payloads or documentation.
+* **Rejected Alternatives:** Hardcoded or database-stored credentials (rejected due to severe security vulnerability).
+
+---
+
+### ADR-038: First-Class Manual Verification Fallback & Auditable Human Decision Workflow
+* **Context:** Providing a robust, auditable fallback mechanism when automated government APIs are absent, rate-limited, time out, or require officer portal verification.
+* **Options Considered:**
+  1. Treating manual verification as an un-tracked external process or bypassing system rule evaluation.
+  2. First-class Manual Fallback Workflow integrated into Procurement Officer Workbench, requiring structured portal reference entry, SHA-256 hashed evidence artifact capture, policy-configurable dual-officer review for high-risk checks, and standard `EvidenceRecord` generation.
+* **Decision:** Implement **First-Class Manual Verification Fallback & Auditable Human Decision Workflow**.
+* **Reason:** Ensures business continuity during government portal outages or for sources lacking public APIs (e.g., debarment lists, EPFO/ESIC). Preserves complete tamper-evident auditability.
+* **Consequences:** Manual fallback actions produce standard evidence records tagged with `MANUAL_FALLBACK` and linked to `OfficerDecision` audit blocks.
+* **Rejected Alternatives:** Un-audited manual overrides or halting procurement evaluation on API failure (rejected due to operational unfeasibility).
+
