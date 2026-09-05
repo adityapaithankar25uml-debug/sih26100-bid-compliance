@@ -1073,6 +1073,150 @@
 * **Consequences:** Feature flags cannot bypass authentication or deterministic compliance evaluation rules.
 * **Rejected Alternatives:** Hardcoded runtime flags or un-audited configuration overrides.
 
+---
+
+### ADR-096: Human Decision Authority & Non-Authoritative AI UX Boundary
+* **Context:** Preventing AI model output from being presented or visually interpreted as an automated, final qualification or disqualification decision.
+* **Options Considered:**
+  1. Allowing AI models to trigger automated bidder qualification or disqualification status changes.
+  2. Non-Authoritative AI UX Boundary establishing that AI models assist with extraction, classification, and summarization, while the human Procurement Officer retains sole decision authority.
+* **Decision:** Implement **Human Decision Authority & Non-Authoritative AI UX Boundary**.
+* **Reason:** Preserves the core system axiom (`AI interprets. Authorized sources verify. Rules evaluate. Evidence proves. Human approves.`). Prevents automated AI disqualification.
+* **Consequences:** All AI outputs carry clear visual disclaimers; qualification decisions require manual officer written justification and signature.
+* **Rejected Alternatives:** Autonomous AI qualification decision UI.
+
+---
+
+### ADR-097: Evidence-First Compliance Matrix & Multi-Dimensional Lineage UI
+* **Context:** Designing the compliance evaluation UI so officers can trace any rule determination backward to its underlying evidence source.
+* **Options Considered:**
+  1. Displaying static, non-interactive compliance summary scores without underlying evidence links.
+  2. Evidence-First Compliance Matrix UI allowing officers to step backward from rule status to fact normalization, extraction bounding box, and raw SHA-256 document digest.
+* **Decision:** Implement **Evidence-First Compliance Matrix & Multi-Dimensional Lineage UI**.
+* **Reason:** Ensures 100% explainability and auditability for every compliance evaluation outcome.
+* **Consequences:** Officers can inspect bounding box coordinates, extraction confidence, and government registry responses directly from the matrix.
+* **Rejected Alternatives:** Single black-box compliance score UI.
+
+---
+
+### ADR-098: Multi-Dimensional Status Taxonomy Separation
+* **Context:** Preventing technical connection errors, missing documents, advisory risk scores, or AI extraction uncertainty from being collapsed into binary PASS/FAIL badges.
+* **Options Considered:**
+  1. Binary PASS/FAIL status taxonomy for all evaluation states.
+  2. Multi-Dimensional Status Taxonomy rendering 10 distinct status badges (`VERIFIED`, `UNVERIFIED`, `MISSING`, `STALE`, `CONFLICTING`, `INVALID`, `UNKNOWN`, `NOT_APPLICABLE`, `MISSING_EVIDENCE`, `HUMAN_REVIEW`).
+* **Decision:** Implement **Multi-Dimensional Status Taxonomy Separation**.
+* **Reason:** Prevents technical API timeouts or missing evidence from automatically triggering bidder disqualification.
+* **Consequences:** Status badges render with distinct color coding and explicit text labels.
+* **Rejected Alternatives:** Binary PASS/FAIL status collapsing.
+
+---
+
+### ADR-099: Role-Aware & Classification-Aware Information Architecture
+* **Context:** Ensuring the UI enforces role-based access control (RBAC) and data classification sensitivity rules across all workspace views.
+* **Options Considered:**
+  1. Universal UI data exposure relying solely on backend access controls.
+  2. Role-Aware & Classification-Aware Information Architecture dynamically tailoring menus, action buttons, PII masking, and data classification badges (`PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `RESTRICTED`, `PII`) per user role.
+* **Decision:** Implement **Role-Aware & Classification-Aware Information Architecture**.
+* **Reason:** Enhances user experience by hiding unauthorized actions while visually highlighting sensitive data handling.
+* **Consequences:** Backend API remains authoritative security boundary; UI unmasking of PII triggers audit logging.
+* **Rejected Alternatives:** Uniform UI data exposure regardless of role.
+
+---
+
+### ADR-100: Version-Aware Tender & Policy Evaluation Workspace Architecture
+* **Context:** Evaluating bids against modified tender corrigenda or updated policy rule definitions over time.
+* **Options Considered:**
+  1. Evaluating bids against dynamic, un-versioned global rule definitions.
+  2. Version-Aware Tender & Policy Evaluation Workspace explicitly binding every view and evaluation to a specific `TenderVersion` and `PolicyVersion`.
+* **Decision:** Implement **Version-Aware Tender & Policy Evaluation Workspace Architecture**.
+* **Reason:** Guarantees historical reproducibility and evaluation integrity when tender amendments or policy thresholds change.
+* **Consequences:** UI headers prominently display bound version IDs; corrigenda diffs highlight rule criteria changes.
+* **Rejected Alternatives:** Un-versioned global evaluation workspaces.
+
+---
+
+### ADR-101: Secure Document Review Boundary & Derivative Provenance Viewer
+* **Context:** Rendering untrusted uploaded PDFs and Office documents safely in browser client viewports without exposing users to malware or script exploits.
+* **Options Considered:**
+  1. Opening raw uploaded files directly in browser native plugins.
+  2. Secure Document Review Boundary rendering disarmed sanitized derivatives alongside original SHA-256 payload digests and bounding box extraction overlays.
+* **Decision:** Implement **Secure Document Review Boundary & Derivative Provenance Viewer**.
+* **Reason:** Prevents browser-based malware execution while maintaining clear distinction between original submissions and sanitized derivatives.
+* **Consequences:** PDF canvas virtualization prevents browser memory bloat on large multi-hundred-page documents.
+* **Rejected Alternatives:** Direct un-sanitized browser rendering of raw uploads.
+
+---
+
+### ADR-102: Government Integration Verification State Presentation
+* **Context:** Presenting government registry verification outcomes (`LIVE`, `SANDBOX`, `MANUAL_FALLBACK`) clearly without misrepresenting technical timeouts as bidder failure.
+* **Options Considered:**
+  1. Rendering failed API connectivity as bidder non-compliance.
+  2. Government Verification State Presentation rendering technical failure as neutral `MANUAL_FALLBACK_REQUIRED` banners and displaying explicit adapter operating mode badges.
+* **Decision:** Implement **Government Integration Verification State Presentation**.
+* **Reason:** Preserves Task 5 architectural boundary separating technical transport failure from business verification result.
+* **Consequences:** Officers receive clear manual fallback prompts when external government gateways time out.
+* **Rejected Alternatives:** Displaying API timeouts as bidder non-compliance.
+
+---
+
+### ADR-103: Human Review Workspace & Non-Destructive Override Governance
+* **Context:** Managing evaluation exceptions, missing evidence, low-confidence extractions, and manual officer overrides.
+* **Options Considered:**
+  1. Allowing manual overrides to overwrite historical automated evaluation snapshot records.
+  2. Human Review Workspace with non-destructive override governance creating linked `ManualOverride` records while preserving immutable historical snapshots.
+* **Decision:** Implement **Human Review Workspace & Non-Destructive Override Governance**.
+* **Reason:** Protects audit integrity and evaluation snapshot reproducibility.
+* **Consequences:** All overrides require written justification notes; policy-sensitive exemptions enforce four-eyes supervisory review.
+* **Rejected Alternatives:** Mutating historical evaluation database snapshots.
+
+---
+
+### ADR-104: Tamper-Evident SHA-256 Audit Explorer Architecture
+* **Context:** Providing auditors with an interactive UI to verify procurement decision timelines and audit block hash continuity.
+* **Options Considered:**
+  1. Providing raw SQL database logs or un-indexed log files to auditors.
+  2. Tamper-Evident SHA-256 Audit Explorer UI displaying continuous block hash links ($H_n = \text{SHA-256}(H_{n-1} \parallel \text{Payload})$) and event payload inspection.
+* **Decision:** Implement **Tamper-Evident SHA-256 Audit Explorer Architecture**.
+* **Reason:** Enables independent verification of audit chain continuity without falsely asserting digital signatures or PKI non-repudiation.
+* **Consequences:** Auditors can trace event lineage and verify block hash integrity across all tender actions.
+* **Rejected Alternatives:** Un-indexed text log files or unsupported digital-signature assertions.
+
+---
+
+### ADR-105: Accessible & Enterprise-Grade Procurement Design System Standards
+* **Context:** Defining visual aesthetics, color semantics, component libraries, and accessibility standards for the platform UI.
+* **Options Considered:**
+  1. Consumer-oriented AI interface designs with purple neon gradients, glassmorphism, and chatbot bubbles.
+  2. Accessible & Enterprise-Grade Procurement Design System establishing deep navy/blue tones, dense data tables, clear status badges, and WCAG 2.1 AA accessibility guidelines.
+* **Decision:** Implement **Accessible & Enterprise-Grade Procurement Design System Standards**.
+* **Reason:** Creates a serious, professional government procurement interface with high data density and accessible contrast.
+* **Consequences:** Color is never the sole indicator of status; high-contrast focus indicators and semantic ARIA markup are enforced.
+* **Rejected Alternatives:** Consumer AI chatbot interfaces or low-contrast neon themes.
+
+---
+
+### ADR-106: Client-Side Security Isolation & Backend-Authoritative RBAC UX Boundary
+* **Context:** Protecting frontend client execution from XSS, clickjacking, CSRF, and authorization bypass vulnerabilities.
+* **Options Considered:**
+  1. Relying on client-side JavaScript checks as the sole authorization mechanism.
+  2. Client-Side Security Isolation with strict CSP headers, DOMPurify HTML sanitization of untrusted text, and backend-authoritative RBAC enforcement on every API request.
+* **Decision:** Implement **Client-Side Security Isolation & Backend-Authoritative RBAC UX Boundary**.
+* **Reason:** Ensures client-side UI hiding improves UX without becoming a single point of security failure.
+* **Consequences:** Untrusted OCR text is sanitized before DOM insertion; secrets and API keys are strictly excluded from frontend bundles.
+* **Rejected Alternatives:** Client-side only security boundaries.
+
+---
+
+### ADR-107: Telemetry-Decoupled Frontend Observability & OpenTelemetry Integration
+* **Context:** Capturing client-side errors, page performance, and user interactions without compromising user privacy or creating compliance dependencies.
+* **Options Considered:**
+  1. Treating client telemetry as authoritative evidence for bidder compliance evaluations.
+  2. Telemetry-Decoupled Frontend Observability propagating correlation IDs via OpenTelemetry Web SDK while keeping operational metrics strictly isolated from compliance evidence.
+* **Decision:** Implement **Telemetry-Decoupled Frontend Observability & OpenTelemetry Integration**.
+* **Reason:** Integrates with Task 9 operational observability without allowing ephemeral browser metrics to influence qualification decisions.
+* **Consequences:** Client telemetry payloads are scrubbed of PII before export; correlation IDs link browser requests to backend traces.
+* **Rejected Alternatives:** Using client telemetry as compliance evidence.
+
 
 
 
