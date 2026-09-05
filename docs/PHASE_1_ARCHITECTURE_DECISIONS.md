@@ -228,3 +228,75 @@
 * **Reason:** Ensures sensitive personal PII is redacted prior to external AI transit while restricting AI output strictly to validated JSON schemas. Extracted values pass to deterministic Python code for rule evaluation — AI is NEVER allowed to compute pass/fail flags directly.
 * **Consequences:** All AI responses must pass schema validation before ingestion into database domain models.
 * **Rejected Alternatives:** Unsanitized AI streaming (rejected due to legal DPDP Act non-compliance and hallucination risks).
+
+---
+
+### ADR-025: Vendor-Agnostic AI Gateway Interface (`AIGatewayInterface`)
+* **Context:** Business modules requiring AI capabilities (extraction, clause mining, explanations) without vendor lock-in to any single cloud provider or LLM SDK.
+* **Options Considered:**
+  1. Coupling business logic directly to a commercial LLM SDK (e.g. OpenAI / Anthropic SDKs).
+  2. Vendor-Agnostic AI Gateway Interface (`AIGatewayInterface`) supporting 4 provider categories (Commercial Cloud, Enterprise Cloud, Self-Hosted vLLM, Local Ollama).
+* **Decision:** Implement **Vendor-Agnostic AI Gateway Interface (`AIGatewayInterface`)**.
+* **Reason:** Prevents vendor lock-in, enables seamless fallback from cloud to on-premise models during network outages, and ensures full compliance with government data localization policies.
+* **Consequences:** Business code depends solely on abstract request/response JSON schema envelopes.
+* **Rejected Alternatives:** Direct vendor SDK coupling (rejected due to vendor lock-in and data localization risks).
+
+---
+
+### ADR-026: Multi-Layer Prompt Injection Sandboxing & Tool Permission Isolation
+* **Context:** Uploaded bidder documents contain untrusted text that may attempt indirect prompt injection (e.g. commands asking the model to ignore rules or alter scores).
+* **Options Considered:**
+  1. Relying solely on LLM base model safety fine-tuning.
+  2. Multi-layer defense: XML/Markdown delimiter sandboxing (`<<<UNTRUSTED_DOC_CONTENT>>>`), rigid Pydantic JSON schema output enforcement, suspicious instruction pre-scanners, and ZERO direct tool execution permissions for AI models.
+* **Decision:** Implement **Multi-Layer Prompt Injection Sandboxing & Tool Permission Isolation**.
+* **Reason:** Guarantees that even if an injection string bypasses LLM text parsing, the model lacks tool permissions to write to database tables or invoke external APIs directly.
+* **Consequences:** All uploaded text is wrapped in strict structural delimiters; AI models operate with zero side-effect permissions.
+* **Rejected Alternatives:** Unsandboxed prompt concatenation (rejected due to severe security vulnerability).
+
+---
+
+### ADR-027: Non-Authoritative AI Axiom & Strict 4-Tier Responsibility Boundary
+* **Context:** Preventing AI models from becoming autonomous decision-makers in government procurement compliance.
+* **Options Considered:**
+  1. Allowing AI models to generate pass/fail recommendations that directly apply to bidder qualification.
+  2. Strict Non-Authoritative Axiom: `AI INTERPRETS → AUTHORIZED SOURCES VERIFY → RULES EVALUATE → EVIDENCE PROVES → HUMAN APPROVES`, enforced across a 4-Tier Responsibility Boundary Matrix.
+* **Decision:** Adopt **Non-Authoritative AI Axiom & 4-Tier Responsibility Boundary Matrix**.
+* **Reason:** Preserves legal accountability and CVC compliance. Final qualification decisions remain strictly attributable to human Procurement Officers; compliance evaluations remain 100% deterministic.
+* **Consequences:** AI outputs are tagged `[AI PROPOSAL - ADVISORY ONLY]` and CANNOT mutate evaluation statuses directly.
+* **Rejected Alternatives:** Autonomous AI qualification decisions (rejected due to violation of procurement law and CVC guidelines).
+
+---
+
+### ADR-028: Mandatory Evidence Citation & 100% Grounding Verification for Explanations
+* **Context:** Ensuring generated plain-language explanations in officer workbenches and CVC audit reports do not contain hallucinated factual claims.
+* **Options Considered:**
+  1. Free-form text explanation generation without strict evidence linkage.
+  2. Mandatory structural evidence citation (`evidence_id`, `page_number`, `bounding_box`) + Automated Grounding Verification Engine checking 100% citation validity before report export.
+* **Decision:** Implement **Mandatory Evidence Citation & 100% Grounding Verification**.
+* **Reason:** Eliminates hallucinated facts in official audit narratives. Every assertion must map directly to an approved `EvidenceRecord` or `VerificationResult` in the database.
+* **Consequences:** Explanations failing grounding checks are rejected and replaced with structured rule output facts.
+* **Rejected Alternatives:** Unchecked free-form LLM explanations (rejected due to hallucination risks).
+
+---
+
+### ADR-029: Immutable Prompt/Template Versioning & Audit Reproducibility Ledger
+* **Context:** Guaranteeing historical reproducibility of AI-derived extraction results during legal disputes or CVC vigilance audits.
+* **Options Considered:**
+  1. Updating prompt templates in-place without version tracking.
+  2. Immutable prompt registry (`SP-{CAT}-{TASK}-v{MAJ}.{MIN}`) with execution metadata logging (model ID, prompt version, schema version, raw response hash) embedded in every database extraction record.
+* **Decision:** Implement **Immutable Prompt/Template Versioning & Audit Reproducibility Ledger**.
+* **Reason:** Enables exact reconstruction of past AI processing contexts during vigilance audits. Model upgrades do not silently overwrite historical extraction data.
+* **Consequences:** Prompts are version-controlled and immutable in production; extraction records store full provenance envelopes.
+* **Rejected Alternatives:** Unversioned prompt edits (rejected due to audit non-reproducibility).
+
+---
+
+### ADR-030: Capability-Based & Sensitivity-Aware Model Routing Strategy
+* **Context:** Routing AI task workloads efficiently across multiple models without compromising high-risk compliance quality or leaking sensitive data.
+* **Options Considered:**
+  1. Routing all requests to a single commercial cloud model based on lowest cost/latency.
+  2. Capability-based and sensitivity-aware routing priority matrix (matching task complexity, data sensitivity classification, and fallback priority).
+* **Decision:** Implement **Capability-Based & Sensitivity-Aware Model Routing Strategy**.
+* **Reason:** Ensures sensitive PII data is processed exclusively on self-hosted or local models, while reserving high-reasoning models for complex tender clause mining regardless of cost.
+* **Consequences:** AI Gateway dynamically evaluates capability, sensitivity, and availability headers before dispatching task requests.
+* **Rejected Alternatives:** Cost-only routing (rejected due to risk of selecting weak models for high-risk compliance evaluation).
