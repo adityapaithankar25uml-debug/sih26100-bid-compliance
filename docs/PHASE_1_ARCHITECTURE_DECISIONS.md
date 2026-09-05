@@ -132,8 +132,8 @@
   2. Standard random UUIDv4 for all primary keys.
   3. Dual Strategy: Internal ULID (`CHAR(26)`) + External UUIDv4.
 * **Decision:** Adopt **Dual Identifier Strategy (Internal ULID + External UUIDv4)**.
-* **Reason:** ULID provides 48-bit timestamp prefix ensuring sequential, append-friendly B-tree index insertions while eliminating auto-increment sequence leaks. External UUIDv4 prevents URL enumeration attacks.
-* **Consequences:** All primary key columns use ULID; external public routes reference `external_id` (UUIDv4).
+* **Reason:** Internal primary keys use **26-character Crockford Base32 encoded ULIDs with lexicographically sortable, time-ordered representation**. ULIDs generally improve index locality compared with random UUIDv4 identifiers because their encoded values are time-ordered. They do not guarantee elimination of B-tree fragmentation or page splits. External UUIDv4 makes resource identifiers difficult to predict and reduces predictable identifier enumeration risk; it does NOT replace authentication, authorization, or object-level access control, which remain strictly mandatory.
+* **Consequences:** All primary key columns use ULID; external public routes reference `external_id` (UUIDv4). Mandatory authorization checks remain enforced on all API endpoints.
 * **Rejected Alternatives:** Integer IDs (rejected due to sequence leakage); UUIDv4 primary keys (rejected due to random B-tree page split performance degradation).
 
 ---

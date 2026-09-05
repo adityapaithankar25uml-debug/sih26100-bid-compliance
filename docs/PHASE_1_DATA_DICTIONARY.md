@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-009  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -21,40 +21,43 @@
 
 ## Data Dictionary Table Index
 
-1. [BC-1: organizations](#1-organizations)
-2. [BC-1: departments](#2-departments)
-3. [BC-1: users](#3-users)
-4. [BC-1: roles & user_roles](#4-roles--user_roles)
-5. [BC-2: tenders](#5-tenders)
-6. [BC-2: tender_versions](#6-tender_versions)
-7. [BC-2: tender_cover_definitions](#7-tender_cover_definitions)
-8. [BC-3: tender_requirements](#8-tender_requirements)
-9. [BC-3: compliance_rules](#9-compliance_rules)
-10. [BC-3: policy_versions](#10-policy_versions)
-11. [BC-4: bidders](#11-bidders)
-12. [BC-4: bidder_identities](#12-bidder_identities)
-13. [BC-4: bid_submissions](#13-bid_submissions)
-14. [BC-4: submission_covers](#14-submission_covers)
-15. [BC-5: source_documents](#15-source_documents)
-16. [BC-5: document_extractions](#16-document_extractions)
-17. [BC-5: extracted_fields](#17-extracted_fields)
-18. [BC-5: bounding_boxes](#18-bounding_boxes)
-19. [BC-6: government_verification_requests](#19-government_verification_requests)
-20. [BC-6: government_verification_results](#20-government_verification_results)
-21. [BC-7: evidence_records](#21-evidence_records)
-22. [BC-8: compliance_evaluations](#22-compliance_evaluations)
-23. [BC-8: qualification_outcomes](#23-qualification_outcomes)
-24. [BC-8: risk_assessment_profiles](#24-risk_assessment_profiles)
-25. [BC-8: risk_factor_signals](#25-risk_factor_signals)
-26. [BC-9: officer_decisions](#26-officer_decisions)
-27. [BC-9: manual_overrides](#27-manual_overrides)
-28. [BC-10: audit_events](#28-audit_events)
-29. [BC-10: audit_hash_chain_blocks](#29-audit_hash_chain_blocks)
-30. [BC-11: system_configurations & government_source_configs](#30-system_configurations--government_source_configs)
+1. [BC-1: organizations (CORE MVP)](#1-organizations)
+2. [BC-1: departments (CORE MVP)](#2-departments)
+3. [BC-1: users (CORE MVP)](#3-users)
+4. [BC-1: roles & user_roles (CORE MVP)](#4-roles--user_roles)
+5. [BC-2: tenders (CORE MVP)](#5-tenders)
+6. [BC-2: tender_versions (CORE MVP)](#6-tender_versions)
+7. [BC-2: tender_cover_definitions (CORE MVP)](#7-tender_cover_definitions)
+8. [BC-3: tender_requirements (CORE MVP)](#8-tender_requirements)
+9. [BC-3: requirement_rule_maps (CORE MVP)](#9-requirement_rule_maps)
+10. [BC-3: compliance_rules (CORE MVP)](#10-compliance_rules)
+11. [BC-3: policy_versions (CORE MVP)](#11-policy_versions)
+12. [BC-4: bidders (CORE MVP)](#12-bidders)
+13. [BC-4: bidder_identities (CORE MVP)](#13-bidder_identities)
+14. [BC-4: bid_submissions (CORE MVP)](#14-bid_submissions)
+15. [BC-4: submission_covers (CORE MVP)](#15-submission_covers)
+16. [BC-5: source_documents (CORE MVP)](#16-source_documents)
+17. [BC-5: document_extractions (CORE MVP)](#17-document_extractions)
+18. [BC-5: extracted_fields (CORE MVP)](#18-extracted_fields)
+19. [BC-5: bounding_boxes (CORE MVP)](#19-bounding_boxes)
+20. [BC-6: government_verification_requests (CORE MVP)](#20-government_verification_requests)
+21. [BC-6: government_verification_attempts (CORE MVP)](#21-government_verification_attempts)
+22. [BC-6: government_verification_results (CORE MVP)](#22-government_verification_results)
+23. [BC-7: evidence_records (CORE MVP)](#23-evidence_records)
+24. [BC-8: compliance_evaluations (CORE MVP)](#24-compliance_evaluations)
+25. [BC-8: qualification_outcomes (CORE MVP)](#25-qualification_outcomes)
+26. [BC-8: risk_assessment_profiles (CORE MVP)](#26-risk_assessment_profiles)
+27. [BC-8: risk_factor_signals (SUPPORTING MVP)](#27-risk_factor_signals)
+28. [BC-9: officer_decisions (CORE MVP)](#28-officer_decisions)
+29. [BC-9: manual_overrides (CORE MVP)](#29-manual_overrides)
+30. [BC-10: audit_events (CORE MVP)](#30-audit_events)
+31. [BC-10: audit_hash_chain_blocks (CORE MVP)](#31-audit_hash_chain_blocks)
+32. [BC-11: system_configurations (SUPPORTING MVP)](#32-system_configurations)
 
 ---
 
 ### 1. `organizations`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Stores top-level tenant organization entities (e.g., CPCL).
 - **Module Owner:** MOD-002 User / Organization Management Module.
 
@@ -69,7 +72,8 @@
 ---
 
 ### 2. `departments`
-- **Description:** Represents departmental hierarchy inside an organization (e.g., CPCL Materials / Contracts Dept).
+- **MVP Classification:** `CORE MVP`
+- **Description:** Represents departmental hierarchy inside an organization (e.g., CPCL Contracts Dept).
 - **Module Owner:** MOD-002 User / Organization Management Module.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
@@ -83,7 +87,8 @@
 ---
 
 ### 3. `users`
-- **Description:** Procurement officers, committee members, auditors, and admin user profiles.
+- **MVP Classification:** `CORE MVP`
+- **Description:** User profiles for procurement officers and committee auditors. Passwords are NEVER stored in plaintext or reversible encryption; slow dedicated hashing (Argon2id/bcrypt) is enforced.
 - **Module Owner:** MOD-001 Authentication & Authorization Module.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
@@ -92,7 +97,7 @@
 | `external_id` | `UUID` | N | Unique | PUBLIC | System Generated | Permanent |
 | `username` | `VARCHAR(100)`| N | Unique | CONFIDENTIAL | User Registration | Mutable |
 | `email` | `VARCHAR(255)`| N | Unique | RESTRICTED/PII | User Registration | Mutable |
-| `password_hash` | `VARCHAR(255)`| N | None | RESTRICTED/PII | Auth Hashing | Mutable (Salted) |
+| `password_hash` | `VARCHAR(255)`| N | None | RESTRICTED/PII | Argon2id/bcrypt Hashing | Mutable (Salted) |
 | `full_name` | `VARCHAR(150)`| N | None | CONFIDENTIAL | User Registration | Mutable |
 | `organization_id` | ULID (`CHAR(26)`) | N | FK `organizations.id`| INTERNAL | Admin Input | Mutable |
 | `department_id` | ULID (`CHAR(26)`) | N | FK `departments.id` | INTERNAL | Admin Input | Mutable |
@@ -102,7 +107,8 @@
 ---
 
 ### 4. `roles` & `user_roles`
-- **Description:** RBAC role definitions (Procurement Officer, Committee Auditor, System Admin) and user mappings.
+- **MVP Classification:** `CORE MVP`
+- **Description:** RBAC role definitions and user assignments.
 - **Module Owner:** MOD-001 Authentication & Authorization Module.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
@@ -116,6 +122,7 @@
 ---
 
 ### 5. `tenders`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Parent tender entity representing a published procurement notice.
 - **Module Owner:** MOD-003 Tender Management Module.
 
@@ -134,7 +141,8 @@
 ---
 
 ### 6. `tender_versions`
-- **Description:** Immutable point-in-time versions of a tender notice created upon publication or corrigenda issuance.
+- **MVP Classification:** `CORE MVP`
+- **Description:** Point-in-time versions of a tender notice created upon publication or corrigenda.
 - **Module Owner:** MOD-003 Tender Management Module.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
@@ -151,6 +159,7 @@
 ---
 
 ### 7. `tender_cover_definitions`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Cover separation requirements (Cover 1 Fee/EMD, Cover 2 Technical, Cover 3 Financial).
 - **Module Owner:** MOD-003 Tender Management Module.
 
@@ -166,8 +175,9 @@
 ---
 
 ### 8. `tender_requirements`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Eligibility criteria items defined for a tender version.
-- **Module Owner:** MOD-004 Requirement Intelligence / MOD-003 Tender Module.
+- **Module Owner:** MOD-004 Requirement Intelligence Module.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -179,11 +189,26 @@
 | `is_mandatory` | `BOOLEAN` | N | Default `TRUE` | PUBLIC | NIT Clause Text | Immutable |
 | `applicable_bidder_type`|`VARCHAR(50)`| N | Check (`ALL`,`MSE`,`STARTUP`) | PUBLIC | NIT Clause Text | Immutable |
 | `confirmation_status`|`VARCHAR(50)`| N | Check (`PROPOSED`,`CONFIRMED`)| PUBLIC | Officer Workflow | Mutable |
-| `compliance_rule_id`| ULID (`CHAR(26)`) | Y | FK `compliance_rules.id`| INTERNAL | Rule Assignment | Mutable |
 
 ---
 
-### 9. `compliance_rules`
+### 9. `requirement_rule_maps`
+- **MVP Classification:** `CORE MVP`
+- **Description:** Junction mapping single requirement to N deterministic compliance rules with priority ordering.
+- **Module Owner:** MOD-012 Deterministic Rule Engine Module.
+
+| Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | ULID (`CHAR(26)`) | N | Primary Key | INTERNAL | System Generated | Permanent |
+| `tender_requirement_id`|ULID (`CHAR(26)`)|N | FK `tender_requirements.id`| INTERNAL | Rule Mapper | Immutable |
+| `compliance_rule_id`| ULID (`CHAR(26)`) | N | FK `compliance_rules.id`| INTERNAL | Rule Mapper | Immutable |
+| `rule_priority_order`|`INTEGER` | N | Check `> 0` | PUBLIC | Rule Mapper | Immutable |
+| `is_mandatory_for_requirement`|`BOOLEAN`|N | Default `TRUE` | PUBLIC | Rule Mapper | Immutable |
+
+---
+
+### 10. `compliance_rules`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Deterministic Pydantic/Python rule evaluation specifications.
 - **Module Owner:** MOD-012 Deterministic Rule Engine Module.
 
@@ -199,7 +224,8 @@
 
 ---
 
-### 10. `policy_versions`
+### 11. `policy_versions`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Immutable regulatory policy versions (e.g., Make in India Order 2017/2024).
 - **Module Owner:** MOD-023 Configuration & Policy Versioning Module.
 
@@ -214,7 +240,8 @@
 
 ---
 
-### 11. `bidders`
+### 12. `bidders`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Master record for bidding vendor legal entities.
 - **Module Owner:** MOD-007 Bidder Management Module.
 
@@ -229,7 +256,8 @@
 
 ---
 
-### 12. `bidder_identities`
+### 13. `bidder_identities`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Child registration identifiers (PAN, GSTIN, CIN, Udyam) for a bidder.
 - **Module Owner:** MOD-008 Bidder Identity Resolution Module.
 
@@ -243,7 +271,8 @@
 
 ---
 
-### 13. `bid_submissions`
+### 14. `bid_submissions`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Bidder's participation submission to a specific tender.
 - **Module Owner:** MOD-007 Bidder Management Module.
 
@@ -259,7 +288,8 @@
 
 ---
 
-### 14. `submission_covers`
+### 15. `submission_covers`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Submitted document container matching tender cover definitions.
 - **Module Owner:** MOD-007 Bidder Management Module.
 
@@ -272,7 +302,8 @@
 
 ---
 
-### 15. `source_documents`
+### 16. `source_documents`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Raw file metadata uploaded by bidders or officers.
 - **Module Owner:** MOD-005 Document Management Module.
 
@@ -291,7 +322,8 @@
 
 ---
 
-### 16. `document_extractions`
+### 17. `document_extractions`
+- **MVP Classification:** `CORE MVP`
 - **Description:** AI/OCR extraction run metadata for a source document.
 - **Module Owner:** MOD-006 Document Intelligence Module.
 
@@ -307,7 +339,8 @@
 
 ---
 
-### 17. `extracted_fields`
+### 18. `extracted_fields`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Individual fields extracted from document text by OCR.
 - **Module Owner:** MOD-006 Document Intelligence Module.
 
@@ -323,7 +356,8 @@
 
 ---
 
-### 18. `bounding_boxes`
+### 19. `bounding_boxes`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Visual coordinate overlays `[x0, y0, x1, y1]` for extracted text tokens.
 - **Module Owner:** MOD-006 Document Intelligence Module.
 
@@ -339,7 +373,8 @@
 
 ---
 
-### 19. `government_verification_requests`
+### 20. `government_verification_requests`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Verification lookup jobs dispatched to government adapters.
 - **Module Owner:** MOD-009 Government Verification Gateway.
 
@@ -356,16 +391,33 @@
 
 ---
 
-### 20. `government_verification_results`
-- **Description:** Response payloads returned by external verification gateways.
+### 21. `government_verification_attempts`
+- **MVP Classification:** `CORE MVP`
+- **Description:** Preserves historical execution attempts, retries, and timeouts for government API calls without overwriting past attempts.
 - **Module Owner:** MOD-009 Government Verification Gateway.
 
 | Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `id` | ULID (`CHAR(26)`) | N | Primary Key | INTERNAL | System Generated | Permanent |
-| `request_id` | ULID (`CHAR(26)`) | N | FK UK `government_verification_requests.id`| INTERNAL | Adapter Dispatch | Immutable |
+| `verification_request_id`|ULID (`CHAR(26)`)|N | FK `government_verification_requests.id`| INTERNAL | Adapter Dispatch | Permanent |
+| `attempt_number` | `INTEGER` | N | Check `> 0` | PUBLIC | Gateway Counter | Immutable |
+| `execution_mode` | `VARCHAR(50)` | N | Check (`LIVE`,`SANDBOX`,`MOCK`,`MANUAL`)| PUBLIC | Gateway Router | Immutable |
+| `http_status_code`|`INTEGER` | Y | None | INTERNAL | Gateway Client | Immutable |
+| `attempted_at` | `TIMESTAMPTZ` | N | Default `NOW()`| PUBLIC | System Clock | Immutable |
+| `error_details` | `TEXT` | Y | None | INTERNAL | Gateway Client | Immutable |
+
+---
+
+### 22. `government_verification_results`
+- **MVP Classification:** `CORE MVP`
+- **Description:** Provenance-tagged response payload yielded by a successful verification attempt.
+- **Module Owner:** MOD-009 Government Verification Gateway.
+
+| Field Name | Data Type | Null | Constraints | Sensitivity | Data Source | Lifecycle Rule |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | ULID (`CHAR(26)`) | N | Primary Key | INTERNAL | System Generated | Permanent |
+| `attempt_id` | ULID (`CHAR(26)`) | N | FK UK `government_verification_attempts.id`| INTERNAL | Adapter Dispatch | Immutable |
 | `status` | `VARCHAR(50)` | N | Check (`VERIFIED`,`NOT_VERIFIED`,`ERROR`)| PUBLIC | Govt Adapter | Immutable |
-| `execution_mode` | `VARCHAR(50)` | N | Check (`LIVE`,`SANDBOX`,`MOCK`,`MANUAL`)| PUBLIC | Govt Adapter | Immutable |
 | `source_authority`|`VARCHAR(150)`| N | Authority Identifier | PUBLIC | Govt Adapter | Immutable |
 | `raw_payload` | `JSONB` | N | JSON Payload | CONFIDENTIAL | Govt API / Mock | Immutable |
 | `payload_hash` | `CHAR(64)` | N | SHA-256 Hash | INTERNAL | Cryptographic Hash | Immutable |
@@ -373,7 +425,8 @@
 
 ---
 
-### 21. `evidence_records`
+### 23. `evidence_records`
+- **MVP Classification:** `CORE MVP`
 - **Description:** First-class evidence objects linking requirements to extracted OCR or API payloads.
 - **Module Owner:** MOD-017 Evidence Ledger Module.
 
@@ -387,13 +440,14 @@
 | `verification_result_id`|ULID (`CHAR(26)`)|Y | FK `government_verification_results.id`| INTERNAL | Evidence Generator | Immutable |
 | `evidence_type` | `VARCHAR(50)` | N | Check (`DOCUMENT_OCR`,`GOVT_API`,`MANUAL_PROOF`)| PUBLIC | Evidence Generator | Immutable |
 | `verification_mode`|`VARCHAR(50)` | N | Check (`LIVE`,`SANDBOX`,`MOCK`,`MANUAL`)| PUBLIC | Provenance Tag | Immutable |
-| `evidence_summary`| `TEXT` | N | CVC Summary Text | PUBLIC | Evidence Generator | Immutable |
+| `evidence_summary`| `TEXT` | N | Summary Text | PUBLIC | Evidence Generator | Immutable |
 | `evidence_sha256` | `CHAR(64)` | N | Unique SHA-256 | INTERNAL | Cryptographic Hash | Immutable |
 | `created_at` | `TIMESTAMPTZ` | N | Default `NOW()`| PUBLIC | System Clock | Immutable |
 
 ---
 
-### 22. `compliance_evaluations`
+### 24. `compliance_evaluations`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Deterministic requirement-level rule evaluation results.
 - **Module Owner:** MOD-012 Deterministic Rule Engine Module.
 
@@ -409,7 +463,8 @@
 
 ---
 
-### 23. `qualification_outcomes`
+### 25. `qualification_outcomes`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Overall bidder qualification outcome summary for a submission.
 - **Module Owner:** MOD-015 Compliance Scoring & Evaluation Module.
 
@@ -424,7 +479,8 @@
 
 ---
 
-### 24. `risk_assessment_profiles`
+### 26. `risk_assessment_profiles`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Independent analytical risk assessment for a bidder submission.
 - **Module Owner:** MOD-014 Risk Engine Module.
 
@@ -438,7 +494,8 @@
 
 ---
 
-### 25. `risk_factor_signals`
+### 27. `risk_factor_signals`
+- **MVP Classification:** `SUPPORTING MVP`
 - **Description:** Child risk breakdown signals (data conflicts, verification failures, anomalies).
 - **Module Owner:** MOD-014 Risk Engine Module.
 
@@ -453,7 +510,8 @@
 
 ---
 
-### 26. `officer_decisions`
+### 28. `officer_decisions`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Sealed final qualification decision recorded by a named procurement officer.
 - **Module Owner:** MOD-019 Officer Decision Workflow Module.
 
@@ -469,7 +527,8 @@
 
 ---
 
-### 27. `manual_overrides`
+### 29. `manual_overrides`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Itemized status overrides performed by officers during evaluation review.
 - **Module Owner:** MOD-019 Officer Decision Workflow Module.
 
@@ -484,7 +543,8 @@
 
 ---
 
-### 28. `audit_events`
+### 30. `audit_events`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Raw application audit events captured before hash-chain sealing.
 - **Module Owner:** MOD-018 Audit Trail Module.
 
@@ -501,7 +561,8 @@
 
 ---
 
-### 29. `audit_hash_chain_blocks`
+### 31. `audit_hash_chain_blocks`
+- **MVP Classification:** `CORE MVP`
 - **Description:** Sealed SHA-256 hash blocks forming a tamper-evident audit chain.
 - **Module Owner:** MOD-018 Audit Trail Module.
 
@@ -516,7 +577,8 @@
 
 ---
 
-### 30. `system_configurations` & `government_source_configs`
+### 32. `system_configurations`
+- **MVP Classification:** `SUPPORTING MVP`
 - **Description:** System parameters and government adapter mode routing configurations.
 - **Module Owner:** MOD-022 System Administration Module.
 

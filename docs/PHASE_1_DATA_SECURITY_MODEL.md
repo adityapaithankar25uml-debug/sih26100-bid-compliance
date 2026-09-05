@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-011  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -43,87 +43,55 @@ All domain data attributes specified in the Data Dictionary are classified into 
 
 ---
 
-## 2. Field-Level Encryption & Hashing Strategy
+## 2. Password, Credential, & Secret Handling Architecture
 
-### 2.1 Encryption at Rest (AES-256-GCM)
-- Database columns classified as `RESTRICTED / PII` MUST be encrypted at rest using **AES-256-GCM** (Galois/Counter Mode) with unique initialization vectors (IV) per record.
-- Affected Columns:
-  - `users.email`
-  - `users.password_hash` (Salted Argon2id / bcrypt hash)
-  - `bidder_identities.identifier_value`
-  - `source_documents.storage_uri`
-
-### 2.2 Cryptographic Integrity Hashing (SHA-256)
-- **Document Hashing:** SHA-256 hash computed on upload (`source_documents.sha256_hash`).
-- **Evidence Hashing:** SHA-256 hash computed on evidence record assembly (`evidence_records.evidence_sha256`).
-- **Verification Payload Hashing:** SHA-256 hash computed on raw government responses (`government_verification_results.payload_hash`).
-- **Officer Decision Sealing:** SHA-256 hash computed on signed decision snapshot (`officer_decisions.snapshot_hash`).
-- **Audit Ledger Chaining:** Block chaining computed across previous and current blocks (`audit_hash_chain_blocks.current_block_hash`).
+> [!IMPORTANT]
+> **Strict Password & Credential Security Rules:**  
+> 1. **No Plaintext Passwords:** Passwords MUST NEVER be stored in plaintext anywhere in database tables, log files, or cache layers.  
+> 2. **No Reversible Encryption for Passwords:** Reversible encryption (e.g. AES/RSA) MUST NOT be used for password storage. Passwords MUST be cryptographically salted and hashed.  
+> 3. **Dedicated Password Hashing:** Password verification MUST use a dedicated slow password hashing algorithm (**Argon2id** / **bcrypt** / **scrypt**) with cryptographically random per-user salts.  
+> 4. **No Secrets in Database Tables:** API keys, GSP client secrets, Protean OPV credentials, JWT signing private keys, and MinIO root passwords MUST NEVER be stored in application database tables.  
+> 5. **Secret Isolation:** Credential material is managed exclusively via HashiCorp Vault or secure environment-level secret mounts and loaded into application memory at runtime.
 
 ---
 
-## 3. DPDP Act 2023 Compliance & PII Masking Architecture
+## 3. Comprehensive Pre-AI Data Protection & Privacy Pipeline
 
-To comply with the Digital Personal Data Protection (DPDP) Act 2023, data transmitted to external cloud AI providers (Google Gemini API / OpenAI API) MUST be sanitized locally before leaving the application boundary.
+To enforce compliance with the Digital Personal Data Protection (DPDP) Act 2023, regex pattern matching is treated as only ONE component of a comprehensive multi-stage Pre-AI Data Protection Pipeline. **The platform MUST NOT automatically transmit every uploaded document to an external cloud AI provider.**
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│              LOCAL OCR TEXT STREAM INGESTION            │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│           LOCAL DETERMINISTIC REGEX REDACTOR            │
-│  • Mask Personal Aadhaar: `[0-9]{4} [0-9]{4} [0-9]{4}`  │
-│  • Mask Personal Phone:   `[+0-9]{10,13}`               │
-│  • Mask Bank Account:     `[0-9]{9,18}`                 │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│         SANITIZED ORGANIZATIONAL DATA ONLY             │
-│  (GSTIN, PAN, CIN, Corporate Address, Financials)       │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│         EXTERNAL AI PROVIDER (Gemini / OpenAI)          │
-└─────────────────────────────────────────────────────────┘
+┌──────────────┐     ┌────────────────┐     ┌─────────────────────┐     ┌───────────────────┐
+│ SOURCE FILE  │──►  │ CLASSIFICATION │──►  │ SENSITIVITY ASSESS  │──►  │ PII POLICY ENGINE │
+└──────────────┘     └────────────────┘     └─────────────────────┘     └───────────────────┘
+                                                                                  │
+┌──────────────┐     ┌────────────────┐     ┌─────────────────────┐               │
+│ AI PROVIDER  │◄──  │ AI ELIGIBILITY │◄──  │ DETERMINISTIC REDACT│◄──────────────┘
+└──────────────┘     └────────────────┘     └─────────────────────┘
 ```
 
-### Key DPDP Act Rules:
-1. **Organizational PII Permitted:** Commercial identifiers (GSTIN, Corporate PAN, CIN, Udyam Number, Official Corporate Address) necessary for public tender eligibility evaluation are classified as business enterprise data and processed for evaluation.
-2. **Individual PII Redacted:** Personal Aadhaar numbers, personal bank account numbers, and personal phone numbers extracted from scanned attachments (e.g. proprietor ID copies) MUST be redacted locally before AI transit.
+### Multi-Stage Pipeline Controls:
+1. **Document Classification:** Identifies document type (Tax Invoice, Financial Audit, OEM Certificate, Proprietary Technical Spec, Personal ID Copy).
+2. **Sensitivity Assessment & Document Blocking:** High-sensitivity personal documents (e.g., individual passport copies, personal tax returns) are **BLOCKED from external cloud AI processing** and routed exclusively to local OCR parser or officer human review.
+3. **Structured Pattern Detection:** Combines regex patterns (Aadhaar, personal phone, bank account), dictionary lookups, and NER (Named Entity Recognition) to tag sensitive tokens.
+4. **Document-Type Specific Redaction:** Applies contextual redaction rules based on document category (e.g. redacting personal signatures and individual bank details on proprietary technical specifications).
+5. **Allowlist & Policy Check:** Verifies that document fields contain authorized organizational PII (GSTIN, Corporate PAN, CIN, Official Corporate Address) necessary for public tender evaluation.
+6. **External-AI Eligibility Routing:** If a document passes all eligibility checks, text is transmitted to Cloud AI (Gemini / OpenAI); otherwise, processing falls back to Local Offline LLM (Ollama Qwen 2.5) or manual human review.
 
 ---
 
-## 4. Absolute Secrets & Credentials Exclusion Policy
+## 4. Field-Level Encryption & Hashing Strategy
 
-> [!CAUTION]
-> **Strict Database Prohibition:**  
-> The database schema MUST NEVER contain tables or columns intended to store API keys, GSP partnership secrets, Protean OPV credentials, JWT signing private keys, MinIO root credentials, or database passwords.
+### 4.1 Encryption at Rest (AES-256-GCM)
+- Database columns classified as `RESTRICTED / PII` MUST be encrypted at rest using **AES-256-GCM** with unique initialization vectors (IV) per record.
+- Affected Columns: `users.email`, `users.password_hash`, `bidder_identities.identifier_value`, `source_documents.storage_uri`.
 
-### Secret Isolation Architecture:
-- All system credentials and private keys MUST be managed externally via **HashiCorp Vault** or secure environment-level secret mounts.
-- Application backend modules retrieve temporary secret tokens in-memory via Vault API / environment variables — secrets are NEVER written to PostgreSQL tables or log files.
+### 4.2 Cryptographic Integrity Hashing (SHA-256)
+- SHA-256 integrity hashes computed for `source_documents.sha256_hash`, `evidence_records.evidence_sha256`, `government_verification_results.payload_hash`, `officer_decisions.snapshot_hash`, and `audit_hash_chain_blocks.current_block_hash`.
 
 ---
 
-## 5. Database RBAC & Application Access Security
+## 5. Database Role-Based Access Control (RBAC)
 
 Database user privileges MUST enforce strict least-privilege segregation:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    DATABASE USER ROLE PRIVILEGE MATRIX                       │
-├─────────────────────┬───────────────────────────────────────────────────────┤
-│ DB ROLE NAME        │ PERMITTED DATABASE PRIVILEGES                         │
-├─────────────────────┼───────────────────────────────────────────────────────┤
-│ `app_backend_user`  │ `SELECT`, `INSERT`, `UPDATE` on standard domain tables │
-│                     │ `INSERT`, `SELECT` ONLY on audit & evidence tables     │
-│                     │ (`NO UPDATE`, `NO DELETE` granted)                    │
-├─────────────────────┼───────────────────────────────────────────────────────┤
-│ `app_migrator_user` │ DDL privileges (`CREATE TABLE`, `ALTER`, `INDEX`)      │
-│                     │ Used strictly during Phase 2 database migration jobs  │
-├─────────────────────┼───────────────────────────────────────────────────────┤
-│ `app_auditor_user`  │ `SELECT` ONLY on audit logs, evidence ledger, & DB    │
-│                     │ (`NO INSERT`, `NO UPDATE`, `NO DELETE` granted)       │
-└─────────────────────┴───────────────────────────────────────────────────────┘
-```
+- `app_backend_user`: `SELECT, INSERT, UPDATE` on business tables; `INSERT, SELECT` ONLY on audit & evidence tables (`NO UPDATE`, `NO DELETE`).
+- `app_auditor_user`: `SELECT` ONLY on audit logs and evidence ledger.

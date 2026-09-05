@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-008  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -33,7 +33,8 @@ erDiagram
     ORGANIZATION ||--o{ TENDER : "issues"
     TENDER ||--o{ TENDER_VERSION : "has_versions"
     TENDER_VERSION ||--o{ TENDER_REQUIREMENT : "defines"
-    TENDER_REQUIREMENT }|--|| COMPLIANCE_RULE : "evaluates_with"
+    TENDER_REQUIREMENT ||--o{ REQUIREMENT_RULE_MAP : "mapped_via"
+    REQUIREMENT_RULE_MAP }|--|| COMPLIANCE_RULE : "applies"
     COMPLIANCE_RULE }|--|| POLICY_VERSION : "governed_by"
 
     BIDDER ||--o{ BIDDER_IDENTITY : "owns"
@@ -47,7 +48,8 @@ erDiagram
     EXTRACTED_FIELD ||--o{ BOUNDING_BOX : "located_at"
 
     BIDDER ||--o{ VERIFICATION_REQUEST : "triggers"
-    VERIFICATION_REQUEST ||--|| VERIFICATION_RESULT : "yields"
+    VERIFICATION_REQUEST ||--o{ VERIFICATION_ATTEMPT : "executes"
+    VERIFICATION_ATTEMPT ||--|| VERIFICATION_RESULT : "yields"
 
     TENDER_REQUIREMENT ||--o{ EVIDENCE_RECORD : "proved_by"
     EXTRACTED_FIELD ||--o{ EVIDENCE_RECORD : "supplies_doc_proof"
@@ -71,7 +73,7 @@ erDiagram
 
 ## 2. Tender, Version, Requirement, and Rule ERD
 
-Visualizes tender publication lifecycle, corrigenda versioning, requirements, deterministic rules, and policy versions.
+Visualizes tender publication lifecycle, corrigenda versioning, requirements, requirement-rule junction mappings, deterministic rules, and policy versions.
 
 ```mermaid
 erDiagram
@@ -116,7 +118,14 @@ erDiagram
         boolean is_mandatory
         string applicable_bidder_type
         string confirmation_status
+    }
+
+    REQUIREMENT_RULE_MAP {
+        ulid id PK
+        ulid tender_requirement_id FK
         ulid compliance_rule_id FK
+        integer rule_priority_order
+        boolean is_mandatory_for_requirement
     }
 
     COMPLIANCE_RULE {
@@ -143,7 +152,8 @@ erDiagram
     TENDER ||--o{ TENDER_VERSION : "has_versions"
     TENDER_VERSION ||--o{ TENDER_COVER_DEFINITION : "defines_covers"
     TENDER_VERSION ||--o{ TENDER_REQUIREMENT : "contains_requirements"
-    TENDER_REQUIREMENT }|--|| COMPLIANCE_RULE : "evaluates_using"
+    TENDER_REQUIREMENT ||--o{ REQUIREMENT_RULE_MAP : "mapped_via"
+    REQUIREMENT_RULE_MAP }|--|| COMPLIANCE_RULE : "executes_rule"
     COMPLIANCE_RULE }|--|| POLICY_VERSION : "derived_from"
 ```
 
@@ -249,7 +259,7 @@ erDiagram
 
 ## 4. Government Verification, Evidence, Compliance, and Risk ERD
 
-Visualizes multi-mode government API verifications, immutable evidence records, requirement-level compliance evaluations, and independent risk profiles.
+Visualizes multi-attempt government API verifications, immutable evidence records, requirement-level compliance evaluations, and independent risk profiles.
 
 ```mermaid
 erDiagram
@@ -264,16 +274,24 @@ erDiagram
         timestamp requested_at
     }
 
+    GOVERNMENT_VERIFICATION_ATTEMPT {
+        ulid id PK
+        ulid request_id FK
+        integer attempt_number
+        string execution_mode
+        integer http_status_code
+        timestamp attempted_at
+        text error_details
+    }
+
     GOVERNMENT_VERIFICATION_RESULT {
         ulid id PK
-        ulid request_id FK UK
+        ulid attempt_id FK UK
         string status
-        string execution_mode
         string source_authority
         jsonb raw_payload
         string payload_hash
         timestamp responded_at
-        string error_message
     }
 
     EVIDENCE_RECORD {
@@ -331,7 +349,8 @@ erDiagram
         float score_contribution
     }
 
-    GOVERNMENT_VERIFICATION_REQUEST ||--|| GOVERNMENT_VERIFICATION_RESULT : "produces"
+    GOVERNMENT_VERIFICATION_REQUEST ||--o{ GOVERNMENT_VERIFICATION_ATTEMPT : "has_attempts"
+    GOVERNMENT_VERIFICATION_ATTEMPT ||--|| GOVERNMENT_VERIFICATION_RESULT : "yields_result"
     EVIDENCE_RECORD }|--o| EXTRACTED_FIELD : "links_ocr"
     EVIDENCE_RECORD }|--o| GOVERNMENT_VERIFICATION_RESULT : "links_api"
     COMPLIANCE_EVALUATION }|--|| EVIDENCE_RECORD : "justified_by"

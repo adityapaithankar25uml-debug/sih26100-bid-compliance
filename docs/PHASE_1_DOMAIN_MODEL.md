@@ -5,7 +5,7 @@
 **Organization:** Ministry of Petroleum & Natural Gas / Chennai Petroleum Corporation Limited (CPCL)  
 **Phase:** 1 — Architecture & Technical Design  
 **Document ID:** SIH26100-ARCH-006  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Date:** 2026-09-05  
 **Implementation Status:** ZERO APPLICATION CODE GENERATED
 
@@ -84,7 +84,62 @@ To prevent data corruption, audit ambiguity, or legal non-compliance, the domain
 
 ---
 
-## 4. Bounded Context Breakdown
+## 4. Multi-Rule Requirement & Multi-Attempt Verification Domain Relationships
+
+### 4.1 Tender Requirement to Compliance Rule Junction (`1 -> N -> 1`)
+A single tender requirement (e.g. "Techno-Commercial Financial Qualification") may mandate multiple deterministic rules (e.g., Turnover Threshold Rule AND Net Worth Rule AND Solvency Ratio Rule).
+
+```
+┌─────────────────────────┐       ┌─────────────────────────┐       ┌─────────────────────────┐
+│   TENDER_REQUIREMENT    │ 1   N │  REQUIREMENT_RULE_MAP   │ N   1 │     COMPLIANCE_RULE     │
+│                         ├──────►│                         ├──────►│                         │
+│ • requirement_code      │       │ • rule_priority_order   │       │ • rule_expression       │
+│ • description           │       │ • is_mandatory_for_req  │       │ • policy_version_id     │
+└─────────────────────────┘       └─────────────────────────┘       └─────────────────────────┘
+```
+- **Rule Priority & Ordering:** Rules within a requirement are evaluated in sequence based on `rule_priority_order`.
+- **Applicability & Versioning:** Each mapped rule references a deterministic `ComplianceRule` linked to an immutable `PolicyVersion`.
+
+### 4.2 Government Verification Attempt Tracking (`1 -> N -> 1`)
+External government verification lookups may experience transient timeouts, network retries, rate limits, or error states. The model explicitly separates the initial request from individual execution attempts and final response payloads to preserve historical attempt records without overwriting past attempts.
+
+```
+┌───────────────────────────┐     ┌───────────────────────────┐     ┌───────────────────────────┐
+│   VERIFICATION_REQUEST    │ 1 N │   VERIFICATION_ATTEMPT    │ 1 1 │    VERIFICATION_RESULT    │
+│                           ├────►│                           ├────►│                           │
+│ • bidder_id               │     │ • attempt_number          │     │ • status (VERIFIED/ERROR) │
+│ • identifier_type         │     │ • execution_mode          │     │ • raw_payload             │
+│ • identifier_value        │     │ • HTTP status / error     │     │ • payload_hash            │
+└───────────────────────────┘     └───────────────────────────┘     └───────────────────────────┘
+```
+- **Retry Preservation:** Every retry produces a new `VerificationAttempt` record with incremented `attempt_number` and timestamp, preserving complete history of timeouts, errors, and fallback transitions.
+
+---
+
+## 5. Pre-AI Data Protection & Privacy Pipeline
+
+To ensure legal compliance under the Digital Personal Data Protection (DPDP) Act 2023 and prevent uncontrolled transmission of sensitive documents to cloud LLMs, all document ingestion passes through a multi-stage Pre-AI Data Protection Pipeline:
+
+```
+┌──────────────┐     ┌────────────────┐     ┌─────────────────────┐     ┌───────────────────┐
+│ SOURCE FILE  │──►  │ CLASSIFICATION │──►  │ SENSITIVITY ASSESS  │──►  │ PII POLICY ENGINE │
+└──────────────┘     └────────────────┘     └─────────────────────┘     └───────────────────┘
+                                                                                  │
+┌──────────────┐     ┌────────────────┐     ┌─────────────────────┐               │
+│ AI PROVIDER  │◄──  │ AI ELIGIBILITY │◄──  │ DETERMINISTIC REDACT│◄──────────────┘
+└──────────────┘     └────────────────┘     └─────────────────────┘
+```
+
+1. **Document Classification:** Identifies document category (e.g. Tax Invoice, Master Data PDF, Personal ID Copy).
+2. **Sensitivity Assessment:** Rates document privacy risk. High-risk personal documents (e.g., passport copies, personal bank passbooks) are flagged.
+3. **PII Detection & Policy Check:** Combines structured pattern detection (regex, dictionary matching) and document-type rules.
+4. **Deterministic Redaction:** Redacts personal Aadhaar numbers, personal phone numbers, and individual bank details.
+5. **External-AI Eligibility Check:** Evaluates whether document text is eligible for external cloud AI (Gemini/OpenAI) or MUST be restricted to local offline AI (Ollama Qwen) or blocked completely from AI processing.
+6. **Human Review Trigger:** If sensitivity exceeds safe thresholds, document is routed to officer human review prior to any LLM processing.
+
+---
+
+## 6. Bounded Context Breakdown
 
 The domain model is organized into **11 Bounded Contexts** encapsulating all 23 system modules established in Task 1.
 
@@ -94,10 +149,10 @@ The domain model is organized into **11 Bounded Contexts** encapsulating all 23 
 ├───────────────────────────────────┬─────────────────────────────────────────┤
 │ BC-1: Organization & Tenant       │ Users, Roles, Departments, Permissions   │
 │ BC-2: Tender Management           │ Tenders, TenderVersions, Corrigenda     │
-│ BC-3: Requirement & Rule          │ TenderRequirements, Rules, PolicyVersions│
+│ BC-3: Requirement & Rule          │ Requirements, RequirementRuleMaps, Rules│
 │ BC-4: Bidder & Submission         │ Bidders, Identifiers, Submissions       │
 │ BC-5: Document & OCR Intelligence │ SourceDocuments, Extractions, OCR Tokens │
-│ BC-6: Government Verification     │ VerificationRequests, Results, Adapters │
+│ BC-6: Government Verification     │ Requests, Attempts, Results, Adapters   │
 │ BC-7: Evidence & Provenance       │ EvidenceRecords, Links, EvidenceHashes  │
 │ BC-8: Evaluation & Risk           │ ComplianceResults, Outcomes, RiskScores │
 │ BC-9: Officer Decision Workflow   │ OfficerDecisions, ManualOverrides       │
@@ -106,96 +161,44 @@ The domain model is organized into **11 Bounded Contexts** encapsulating all 23 
 └───────────────────────────────────┴─────────────────────────────────────────┘
 ```
 
-### BC-1: Organization & Tenant Bounded Context
-- **Aggregates:** `Organization` (Tenant Root), `Department`, `User` (User Root), `Role`.
-- **Entities:** `Organization`, `Department`, `User`, `Role`, `Permission`, `UserRole`.
-- **Responsibility:** Manages organizational hierarchy, user profiles, RBAC assignments, and multi-tenant access boundaries for CPCL departments.
-
-### BC-2: Tender Management Bounded Context
-- **Aggregates:** `Tender` (Tender Aggregate Root), `TenderVersion`.
-- **Entities:** `Tender`, `TenderVersion`, `TenderCorrigendum`, `TenderCoverDefinition`.
-- **Domain Rule:** Tenders are parent container entities. Every publication or corrigendum creates a new immutable `TenderVersion`. Requirements and rules MUST link to a specific `TenderVersion`, ensuring historical point-in-time explainability when corrigenda alter eligibility criteria.
-
-### BC-3: Requirement & Rule Bounded Context
-- **Aggregates:** `TenderRequirement` (Requirement Root), `ComplianceRule`, `PolicyVersion`.
-- **Entities:** `TenderRequirement`, `ComplianceRule`, `PolicyVersion`, `RequirementRuleMap`.
-- **Domain Rule:** AI requirement extractions create `TenderRequirement` proposals marked as `UNCONFIRMED`. Procurement officers must explicitly confirm requirement schemas before activation. Rules link to immutable `PolicyVersion` definitions (e.g., PPP-MII Order 2017/2024).
-
-### BC-4: Bidder & Submission Bounded Context
-- **Aggregates:** `Bidder` (Bidder Root), `BidSubmission` (Submission Root).
-- **Entities:** `Bidder`, `BidderIdentity`, `BidSubmission`, `SubmissionCoverManifest`.
-- **Domain Rule:** Bidders are legal entities identified by an immutable internal ULID. PAN, GSTIN, CIN, and Udyam are child `BidderIdentity` records. A Bidder can submit to multiple Tenders; a Tender receives multiple Bidders. This N:M relationship is captured by `BidSubmission`.
-
-### BC-5: Document & OCR Intelligence Bounded Context
-- **Aggregates:** `SourceDocument` (Document Root), `DocumentExtraction`.
-- **Entities:** `SourceDocument`, `DocumentExtraction`, `ExtractedField`, `BoundingBoxCoordinate`.
-- **Domain Rule:** `SourceDocument` stores file metadata, SHA-256 checksums, and MinIO storage URIs. `DocumentExtraction` captures AI/OCR model runs, extracted text tokens, confidence scores, and bounding box coordinates `[x0, y0, x1, y1]`.
-
-### BC-6: Government Verification Bounded Context
-- **Aggregates:** `GovernmentVerificationRequest` (Verification Root).
-- **Entities:** `GovernmentVerificationRequest`, `GovernmentVerificationResult`, `VerificationAdapterLog`.
-- **Domain Rule:** Captures external government lookups across GSTN, PAN, MCA, Udyam, etc. Every record retains provenance: runtime mode (`LIVE`, `SANDBOX`, `MOCK`, `MANUAL_FALLBACK`), source authority, raw payload, and response timestamp.
-
-### BC-7: Evidence & Provenance Bounded Context
-- **Aggregates:** `EvidenceRecord` (Evidence Root).
-- **Entities:** `EvidenceRecord`, `EvidenceLink`, `EvidenceHashLedger`.
-- **Domain Rule:** First-class domain object answering "What proves this compliance evaluation?". Connects requirement evaluation to document bounding boxes or API verification payloads with cryptographic SHA-256 hashes. Evidence is append-only; corrections create new evidence records.
-
-### BC-8: Evaluation & Risk Bounded Context
-- **Aggregates:** `ComplianceEvaluation` (Evaluation Root), `RiskProfile`.
-- **Entities:** `RequirementComplianceResult`, `SubmissionQualificationOutcome`, `EvidenceConfidenceScore`, `RiskAssessmentProfile`, `RiskFactorSignal`.
-- **Domain Rule:** Evaluates requirement compliance deterministically (`PASS`, `FAIL`, `REVIEW`, etc.) and determines `Qualification Outcome` (`COMPLIANT`, `NOT COMPLIANT`, `PROVISIONAL`). `RiskAssessmentProfile` computes analytical risk scores (0.0 to 100.0) independently. Risk score CANNOT independently qualify/disqualify a bidder.
-
-### BC-9: Officer Decision Workflow Bounded Context
-- **Aggregates:** `OfficerDecision` (Decision Root).
-- **Entities:** `OfficerDecision`, `ManualOverrideRecord`, `OfficerDecisionSnapshot`.
-- **Domain Rule:** Records final human qualification decisions (`QUALIFY`, `DISQUALIFY`, `SEEK_CLARIFICATION`). Requires mandatory justification rationale text for overrides. Sealed into the audit log.
-
-### BC-10: Audit & Security Integrity Bounded Context
-- **Aggregates:** `AuditEvent` (Audit Root).
-- **Entities:** `AuditEvent`, `AuditHashChainBlock`.
-- **Domain Rule:** Append-only tamper-evident log using SHA-256 hash chaining (`Block_n = SHA256(Block_{n-1} + Timestamp + Actor + Payload)`). Provides undeniable mathematical proof of tampering.
-
-### BC-11: System & Integration Configuration Bounded Context
-- **Aggregates:** `SystemConfiguration`.
-- **Entities:** `SystemConfiguration`, `GovernmentSourceConfig`, `AdapterModeRouting`.
-- **Domain Rule:** Controls integration adapter modes per domain, global rate limits, and system parameters.
-
 ---
 
-## 5. Temporal Explainability & Versioning Model
+## 7. Entity Complexity & MVP Classification Matrix
 
-The domain model guarantees **historical explainability**. An evaluation performed on a given date remains 100% reproducible even if tenders, policies, rules, government data, or bidder attributes change over time.
+Every entity in the domain model is classified to maintain **minimum necessary complexity** for the MVP while preserving enterprise architectural integrity:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     POINT-IN-TIME EXPLAINABILITY MODEL                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 1. TenderVersion       ──► Locks tender eligibility criteria on publication  │
-│ 2. PolicyVersion       ──► Locks regulatory policy (e.g., MII Order 2017)   │
-│ 3. ComplianceRule      ──► Versioned deterministic expression schema         │
-│ 4. DocumentExtraction  ──► Locked OCR model version & prompt version         │
-│ 5. VerificationResult  ──► Timestamped snapshot of API response payload     │
-│ 6. EvidenceRecord      ──► Cryptographically hashed proof snapshot           │
-│ 7. OfficerDecision     ──► Sealed decision snapshot at time of sign-off      │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 6. Module Data Ownership & Prohibitions Matrix
-
-| System Module (MOD) | Primary Data Ownership (Entities) | Read Access Rights | Strict Data Prohibitions (MUST NOT) |
+| Entity Name | Bounded Context | MVP Classification | Functional Justification |
 | :--- | :--- | :--- | :--- |
-| **MOD-001 Auth** | `users`, `user_roles`, `permissions` | All modules (token validation) | MUST NOT modify tenders or evaluate rules |
-| **MOD-003 Tender** | `tenders`, `tender_versions`, `corrigenda` | All modules | MUST NOT execute AI extraction or evaluate bidders |
-| **MOD-004 Req Intel** | `proposed_requirements` | Tender Module, Rule Engine | MUST NOT auto-confirm rules without human sign-off |
-| **MOD-005 Doc Mgr** | `source_documents` | Doc Intel, Evidence Ledger | MUST NOT parse text or execute OCR logic |
-| **MOD-006 Doc Intel** | `document_extractions`, `extracted_fields` | Rule Engine, Evidence Ledger | MUST NOT compare numbers against rules or assign PASS/FAIL |
-| **MOD-007 Bidder** | `bidders`, `bidder_identities`, `bid_submissions` | Verification Gateway, Rule Engine | MUST NOT execute government verifications or score eligibility |
-| **MOD-009 Govt Gateway**| `verification_requests`, `verification_results` | Rule Engine, Evidence Ledger | MUST NOT bypass government approval or present mocks as live |
-| **MOD-012 Rule Engine** | `compliance_results`, `qualification_outcomes` | Risk Engine, Decision Workflow | MUST NOT use non-deterministic LLM logic for evaluation |
-| **MOD-014 Risk Engine** | `risk_profiles`, `risk_factors` | Decision Workflow | MUST NOT allow risk score to determine qualification status |
-| **MOD-017 Evidence** | `evidence_records`, `evidence_links` | Decision Workflow, Audit Module | MUST NOT allow UPDATE or DELETE of committed evidence |
-| **MOD-018 Audit Logger**| `audit_events`, `audit_hash_chain` | Auditor Dashboard | MUST NOT support UPDATE or DELETE on audit logs |
-| **MOD-019 Officer Decision**| `officer_decisions`, `manual_overrides` | Reporting Module, Audit Module | MUST NOT allow decision sign-off without mandatory rationale |
+| `organizations` | BC-1 | **CORE MVP** | Multi-tenant organization boundaries |
+| `departments` | BC-1 | **CORE MVP** | CPCL department routing and access control |
+| `users` | BC-1 | **CORE MVP** | Procurement officer profiles & authentication |
+| `roles` & `user_roles` | BC-1 | **CORE MVP** | RBAC permission enforcement |
+| `tenders` | BC-2 | **CORE MVP** | Tender parent entity |
+| `tender_versions` | BC-2 | **CORE MVP** | Corrigenda versioning & deadline tracking |
+| `tender_cover_definitions`| BC-2 | **CORE MVP** | Multi-cover tender separation (Fee/Tech/Fin) |
+| `tender_requirements` | BC-3 | **CORE MVP** | Eligibility criteria definitions |
+| `requirement_rule_maps` | BC-3 | **CORE MVP** | Junction linking requirements to N rules |
+| `compliance_rules` | BC-3 | **CORE MVP** | Deterministic Pydantic rule expressions |
+| `policy_versions` | BC-3 | **CORE MVP** | Regulatory policy versioning (MII/MSE) |
+| `bidders` | BC-4 | **CORE MVP** | Bidder legal entity profiles |
+| `bidder_identities` | BC-4 | **CORE MVP** | Child registration identifiers (PAN/GSTIN/CIN) |
+| `bid_submissions` | BC-4 | **CORE MVP** | Bidder submission participation records |
+| `submission_covers` | BC-4 | **CORE MVP** | Submitted cover containers |
+| `source_documents` | BC-5 | **CORE MVP** | Uploaded file blobs & SHA-256 hashes |
+| `document_extractions` | BC-5 | **CORE MVP** | AI/OCR extraction run metadata |
+| `extracted_fields` | BC-5 | **CORE MVP** | Extracted field key-value pairs |
+| `bounding_boxes` | BC-5 | **CORE MVP** | PDF page overlay coordinates `[x0,y0,x1,y1]` |
+| `verification_requests` | BC-6 | **CORE MVP** | Government lookup job triggers |
+| `verification_attempts` | BC-6 | **CORE MVP** | Historical retry and timeout tracking |
+| `verification_results` | BC-6 | **CORE MVP** | Provenance-tagged external payloads |
+| `evidence_records` | BC-7 | **CORE MVP** | Immutable evidence linking rules to proof |
+| `compliance_evaluations` | BC-8 | **CORE MVP** | Itemized requirement pass/fail results |
+| `qualification_outcomes` | BC-8 | **CORE MVP** | Overall bidder qualification outcome |
+| `risk_assessment_profiles`| BC-8 | **CORE MVP** | Independent analytical risk scores |
+| `risk_factor_signals` | BC-8 | **SUPPORTING MVP**| Granular risk factor breakdown signals |
+| `officer_decisions` | BC-9 | **CORE MVP** | Sealed human qualification decisions |
+| `manual_overrides` | BC-9 | **CORE MVP** | Officer status override rationale records |
+| `audit_events` | BC-10 | **CORE MVP** | Application infrastructure audit logs |
+| `audit_hash_chain_blocks`| BC-10 | **CORE MVP** | SHA-256 tamper-evident hash blocks |
+| `system_configurations` | BC-11 | **SUPPORTING MVP**| Global integration adapter mode toggles |
+| `tender_clause_embeddings`| BC-2/BC-3 | **FUTURE / RESERVED**| Optional semantic vector search (RAG) |
