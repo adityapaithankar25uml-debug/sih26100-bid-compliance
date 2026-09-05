@@ -17,6 +17,8 @@
 
 **Zero Application Code Mandate:** This document defines technical API contracts, endpoint parameters, JSON schemas, header requirements, and provenance metadata specifications. No FastAPI routers, controllers, frontend API clients, database migrations, or backend source files are created.
 
+> **Resource Derivation Principle:** API resources are derived from the approved domain model and module boundaries. A resource endpoint is not required to map 1:1 to a database entity. Resources may represent entities, aggregate resources, computed/read models, operational resources, or asynchronous job resources where appropriate. No new database entities are introduced beyond the approved Phase 1 domain model.
+
 ---
 
 ## Resource Area Index (23 Resource Areas)
@@ -172,6 +174,7 @@
 #### `POST /api/v1/submissions/{submission_id}/documents/upload`
 - **Purpose:** Initiates encrypted document upload to MinIO.
 - **Roles:** `PROCUREMENT_OFFICER`, `PROCUREMENT_ADMIN`
+- **Upload Configuration Policy:** File upload payload limits, chunk size, and reverse proxy upload settings are configurable deployment options. Resumable/multipart upload strategies are supported for large tender document packages.
 - **Response `202 Accepted`:** Dispatches background virus check & SHA-256 hash generation task.
 
 ---
@@ -312,6 +315,7 @@
 #### `POST /api/v1/bid-submissions/{submission_id}/decision`
 - **Purpose:** Records human procurement officer final qualification decision.
 - **Roles:** `PROCUREMENT_OFFICER`
+- **Security & Authorization Principle:** Officer decisions must be authenticated, authorized according to RBAC, attributable to the acting user, validated according to the decision contract, and recorded in the tamper-evident audit/hash-chain mechanism.
 - **Request Body:**
   ```json
   {
@@ -319,7 +323,7 @@
     "justification_rationale": "All Cover 1 and Cover 2 requirements satisfied. CA Turnover Certificate verified on Page 3."
   }
   ```
-- **Response `201 Created`:** Seals decision snapshot into tamper-evident audit ledger.
+- **Response `201 Created`:** Records decision snapshot into tamper-evident audit ledger.
 
 ---
 

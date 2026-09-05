@@ -32,8 +32,17 @@ The API design preserves this operational pipeline across all endpoints:
 - AI extractions are returned as *proposals* or *unconfirmed data*.
 - External verifications return *provenance tags* (`[LIVE_VERIFIED]`, `[SANDBOX_VERIFIED]`, `[MOCK_SIMULATED]`, `[MANUAL_VERIFIED]`).
 - Rule engine evaluations return *deterministic itemized statuses* (`PASS`, `FAIL`, `REVIEW`, etc.).
-- Officer decision endpoints enforce *mandatory justification rationale strings* and *cryptographic decision sign-off*.
+- Officer decisions must be authenticated, authorized according to RBAC, attributable to the acting user, validated according to the decision contract, and recorded in the tamper-evident audit/hash-chain mechanism.
 - Risk scores are returned as *independent analytical metrics* (0.0 to 100.0) that CANNOT auto-qualify or auto-disqualify a bidder.
+
+### 1.2 Resource Mapping & Derivation Principle
+API resources are derived from the approved domain model and module boundaries. A resource endpoint is not required to map 1:1 to a database entity. Resources may represent entities, aggregate resources, computed/read models, operational resources, or asynchronous job resources where appropriate. No new database entities are introduced by this API specification beyond the approved Phase 1 domain model.
+
+### 1.3 Evidence-First Architecture with Intermediate State Support
+A compliance evaluation that is finalized as decision-relevant must contain sufficient provenance/evidence or explicitly identify why evidence is unavailable. Requirements may exist before evidence is collected and may therefore remain in states such as `MISSING` or `NOT_VERIFIED`. Evidence is not required to exist merely for a requirement record to be created.
+
+### 1.4 Government Business Results vs. Technical Failures
+A successful interaction with a government source may produce a domain/business verification result such as `PASS`, `FAIL`, `NOT_VERIFIED`, `CONFLICT`, or `NOT_APPLICABLE` (for example, a successful provider query that finds no matching registration returns domain result `NOT_VERIFIED`). In contrast, technical provider unavailability, gateway timeouts, or adapter failures remain transport/integration HTTP failures (`502 Bad Gateway`, `503 Service Unavailable`, `504 Gateway Timeout`). Technical failures must NOT be collapsed into compliance `FAIL`.
 
 ---
 
@@ -71,26 +80,35 @@ X-Idempotency-Key: <ULID_IDEMPOTENCY_KEY>  (Required for POST job triggers)
 - **Timestamps:** ISO-8601 UTC strings with millisecond precision (`YYYY-MM-DDTHH:MM:SS.sssZ`).
 - **Enums:** Upper-case string literals matching domain dictionary taxonomies (e.g. `PASS`, `FAIL`, `LIVE`, `MOCK`, `COMPLIANT`).
 
+### 3.4 Configurable File Upload Policy
+- File upload maximum payload limits are deployment configuration settings.
+- Chunk size for multi-part file uploads is configurable.
+- Reverse proxy (e.g., NGINX) and application payload limits are managed via environment configuration.
+- Resumable/multipart upload mechanisms may be used for large tender document packages.
+- Exact production thresholds will be established during Phase 2 implementation and load/security testing.
+
 ---
 
 ## 4. Synchronous vs. Asynchronous Job API Pattern
 
-To prevent HTTP request timeouts during long-running tasks, APIs are strictly categorized into **Synchronous** and **Asynchronous Job** endpoints.
+To prevent HTTP request timeouts and server resource exhaustion, APIs are categorized into **Synchronous** and **Asynchronous Job** endpoints based on operational capability requirements:
+
+> **Capability-Based Async Rule:** Long-running, compute-intensive, externally dependent, bulk, retryable, or workflow-oriented operations should use asynchronous job execution. Simple CRUD/read operations should remain synchronous unless implementation benchmarking demonstrates a need for asynchronous execution.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    SYNCHRONOUS VS. ASYNCHRONOUS JOBS                        │
 ├───────────────────────┬─────────────────────────────────────────────────────┤
-│ SYNCHRONOUS (Direct)  │ Fast read/write operations (< 500ms):              │
+│ SYNCHRONOUS (Direct)  │ Direct CRUD & interactive operations:               │
 │                       │ • User auth, tender reads, requirement confirmation,│
 │                       │   officer decision submission, audit log query      │
 ├───────────────────────┼─────────────────────────────────────────────────────┤
-│ ASYNCHRONOUS (Job)    │ Long-running background operations (> 1000ms):      │
-│                       │ • Document PDF upload parsing & magic-byte check    │
+│ ASYNCHRONOUS (Job)    │ Long-running & externally dependent operations:     │
+│                       │ • Document PDF upload parsing & virus checking      │
 │                       │ • OCR field extraction & bounding box rendering     │
-│                       │ • AI tender requirement extraction                 │
-│                       │ • External government API verification calls        │
-│                       │ • Deterministic compliance evaluation runs          │
+│                       │ • AI tender requirement extraction                  │
+│                       │ • External government API verification workflows    │
+│                       │ • Bulk deterministic compliance evaluation runs     │
 │                       │ • CVC audit PDF report compilation                  │
 └───────────────────────┴─────────────────────────────────────────────────────┘
 ```

@@ -51,7 +51,7 @@ The table below maps HTTP transport status codes to platform error conditions:
 | Status Code | Standard Title | Application Condition |
 | :--- | :--- | :--- |
 | **`400`** | Bad Request | Malformed JSON payload, syntax errors, or unparseable headers. |
-| **`401`** | Unauthorized | Missing, expired, or cryptographically invalid JWT access token. |
+| **`401`** | Unauthorized | Missing, expired, or invalid JWT access token signature/format. |
 | **`402`** | Payment Required | Unused in platform. |
 | **`403`** | Forbidden | Valid JWT token, but user role lacks RBAC permission for action. |
 | **`404`** | Not Found | Target URI resource parameter (`external_id`) does not exist. |
@@ -59,9 +59,9 @@ The table below maps HTTP transport status codes to platform error conditions:
 | **`422`** | Unprocessable Entity| Schema validation failure on request parameters or Pydantic models. |
 | **`429`** | Too Many Requests | Sliding window rate limit exceeded for user IP or JWT user ID. |
 | **`500`** | Internal Server Error| Unexpected uncaught application backend exception. |
-| **`502`** | Bad Gateway | External government portal API returned invalid network response. |
-| **`503`** | Service Unavailable| External adapter circuit breaker is TRIPPED (`OPEN` state). |
-| **`504`** | Gateway Timeout | External government portal API request exceeded 10-second timeout. |
+| **`502`** | Bad Gateway | External government portal API returned invalid gateway payload or bad network response. |
+| **`503`** | Service Unavailable| External adapter circuit breaker is TRIPPED (`OPEN` state) or provider unavailable. |
+| **`504`** | Gateway Timeout | External government portal API request timed out. |
 
 ---
 
@@ -69,12 +69,13 @@ The table below maps HTTP transport status codes to platform error conditions:
 
 > [!IMPORTANT]
 > **Transport vs. Business Status Isolation:**  
-> HTTP error status codes (4xx/5xx) represent **protocol, network, authentication, or validation failures**. They MUST NOT be used to represent valid business evaluation findings.
+> HTTP error status codes (4xx/5xx) represent **protocol, network, authentication, gateway, or validation failures**. They MUST NOT be used to represent valid business evaluation findings.
 
 ### Business Status Mapping Rules:
-1. **Unverified Government Payload:** A government verification returning `NOT_VERIFIED` or `UNAVAILABLE` is a **valid `200 OK` response** containing `status: "NOT_VERIFIED"` and provenance tag `[MANUAL_FALLBACK]`. It is NOT an HTTP 404 or 502 error.
-2. **Failed Compliance Requirement:** A bidder failing a financial turnover requirement is a **valid `200 OK` response** containing `compliance_status: "FAIL"`. It is NOT an HTTP 400 or 403 error.
-3. **High Analytical Risk Score:** A bidder with a critical risk score (e.g. 85.0) is a **valid `200 OK` response** containing `risk_level: "HIGH"`.
+1. **Government Verification Domain Results:** A successful interaction with a government source may produce a domain/business verification result such as `PASS`, `FAIL`, `NOT_VERIFIED`, `CONFLICT`, or `NOT_APPLICABLE`. For example, a successful provider query that finds no matching registration returns a valid `200 OK` response containing domain result `NOT_VERIFIED` (and provenance tag `[MANUAL_FALLBACK]`). It is NOT an HTTP 404 error.
+2. **Technical Government Integration Failures:** In contrast, technical failures such as provider unavailability, network timeouts, or bad gateway responses remain transport/integration HTTP failures (`502 Bad Gateway`, `503 Service Unavailable`, `504 Gateway Timeout`). Technical failures MUST NOT be collapsed into a business compliance `FAIL`.
+3. **Failed Compliance Requirement:** A bidder failing a financial turnover requirement is a **valid `200 OK` response** containing `compliance_status: "FAIL"`. It is NOT an HTTP 400 or 403 error.
+4. **High Analytical Risk Score:** A bidder with a critical risk score (e.g. 85.0) is a **valid `200 OK` response** containing `risk_level: "HIGH"`.
 
 ---
 
