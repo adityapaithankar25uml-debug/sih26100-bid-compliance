@@ -40,7 +40,7 @@ export function WhyExplanationPanel({ explanation, loading }: WhyExplanationPane
       <div className="flex items-center justify-between bg-slate-900 text-white p-4 rounded-t-lg">
         <div className="flex items-center gap-2">
           <HelpCircle className="w-5 h-5 text-amber-400" />
-          <h3 className="font-bold text-sm">Deterministic Compliance Explanation ("Why?" View)</h3>
+          <h3 className="font-bold text-sm">Deterministic Compliance Explanation (&quot;Why?&quot; View)</h3>
         </div>
         <div className="text-right text-xs">
           <span className="text-slate-400 block">Overall Status</span>

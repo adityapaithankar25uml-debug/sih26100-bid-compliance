@@ -58,21 +58,18 @@ export default function DocumentUploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-6 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Procurement Document Ingestion</h1>
-            <p className="text-sm text-slate-600">
-              Securely upload tender or bidder documents for validation, malware scanning, classification, and AI extraction.
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">Procurement Document Ingestion</h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Securely upload tender or bidder documents for validation, malware scanning, classification, and AI extraction.
+        </p>
+      </div>
 
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-sm text-amber-900">
-            <span className="font-semibold">System Notice:</span> Extracted document facts and AI proposals are advisory candidates only. Final qualification decisions remain exclusively human-driven by the Procurement Officer.
-          </div>
+      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900">
+        <span className="font-bold">System Notice:</span> Extracted document facts and AI proposals are advisory candidates only. Final qualification decisions remain exclusively human-driven by the Procurement Officer.
+      </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
@@ -158,8 +155,7 @@ export default function DocumentUploadPage() {
               </div>
             )}
           </div>
-        </main>
-      </div>
     </div>
   );
 }
+

@@ -263,3 +263,53 @@ export interface EvaluationSnapshot {
   snapshot_hash: string;
   created_at: string;
 }
+
+export interface GovernmentSource {
+  id: string;
+  source_code: string;
+  name: string;
+  description: string;
+  adapter_type: string;
+  integration_mode: 'LIVE' | 'SANDBOX' | 'MOCK' | 'MANUAL_FALLBACK';
+  enabled: boolean;
+}
+
+export interface GovernmentVerificationRecord {
+  id: string;
+  bid_submission_id: string;
+  source_code: string;
+  identifier_value?: string;
+  technical_status: string;
+  business_status: string;
+  identity_match_confidence?: number;
+  response_payload?: Record<string, any>;
+  normalized_facts?: Record<string, any>;
+  verified_at: string;
+  evidence_record_id?: string;
+}
+
+export interface ComplianceMatrixItem {
+  requirement_id: string;
+  requirement_code: string;
+  requirement_title: string;
+  category: string;
+  rule_code: string;
+  rule_name: string;
+  fact_code?: string;
+  fact_value?: any;
+  fact_status?: string;
+  source_code?: string;
+  verification_status?: string;
+  compliance_status: string;
+  evidence_ref?: string;
+  explanation?: string;
+}
+
+export interface ComplianceMatrixResponse {
+  bid_submission_id: string;
+  tender_id: string;
+  overall_status: string;
+  qualification_recommendation: string;
+  matrix_items: ComplianceMatrixItem[];
+}
+

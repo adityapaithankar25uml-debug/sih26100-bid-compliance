@@ -38,21 +38,22 @@ export default function AuditPage() {
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Lock className="w-5 h-5 text-amber-600" />
-            Tamper-Evident Audit Hash Chain
+            <Lock className="w-5.5 h-5.5 text-amber-600" />
+            Verify Tamper-Evident SHA-256 Audit Hash Chain
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            SHA-256 canonical event lineage providing tamper-evident historical auditability
+            SHA-256 canonical event log providing tamper-evident historical auditability & integrity verification
           </p>
         </div>
         <button
           onClick={handleVerify}
           disabled={verifying}
-          className="bg-navy-900 hover:bg-gov-blue text-white text-xs font-semibold py-2 px-4 rounded flex items-center space-x-2 transition-colors shadow-sm"
+          className="bg-navy-900 hover:bg-gov-blue text-white text-xs font-bold py-2 px-4 rounded flex items-center space-x-2 transition-colors shadow-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin' : ''}`} />
-          <span>{verifying ? 'Verifying Chain...' : 'Re-Verify Chain Integrity'}</span>
+          <span>{verifying ? 'Verifying Integrity...' : 'Verify Audit Chain Integrity'}</span>
         </button>
+
       </div>
 
       {/* Chain Status Card */}

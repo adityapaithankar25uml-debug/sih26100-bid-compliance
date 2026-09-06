@@ -9,17 +9,24 @@ module.exports = {
     extend: {
       colors: {
         navy: {
-          900: '#0f172a',
+          950: '#0a101d',
+          900: '#0a192f',
+          850: '#112240',
           800: '#1e293b',
           700: '#334155',
+          600: '#475569',
         },
         gov: {
-          blue: '#1d4ed8',
-          light: '#eff6ff',
+          dark: '#0f172a',
+          blue: '#1e40af',
           accent: '#2563eb',
+          light: '#eff6ff',
+          gold: '#d97706',
+          slate: '#f8fafc',
         },
       },
     },
   },
   plugins: [],
 }
+
