@@ -11,6 +11,7 @@ export const Sidebar: React.FC = () => {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Tenders Catalog', href: '/tenders', icon: FileText },
     { name: 'Bid Submissions', href: '/bids', icon: FolderCheck },
+    { name: 'Document Ingestion', href: '/documents/upload', icon: FileText },
     { name: 'Audit Hash Chain', href: '/audit', icon: Lock },
     { name: 'Role Switch / Auth', href: '/login', icon: LogIn },
   ];

@@ -123,3 +123,43 @@ export async function verifyAuditChain(): Promise<AuditChainVerify | null> {
     return null;
   }
 }
+
+export async function fetchDocumentStatus(documentId: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/status`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchDocumentEvidence(documentId: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/documents/${documentId}/evidence`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchTenderRequirementCandidates(tenderId: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/tenders/${tenderId}/requirement-candidates`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchBidInconsistencyCandidates(submissionId: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/inconsistency-candidates`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}

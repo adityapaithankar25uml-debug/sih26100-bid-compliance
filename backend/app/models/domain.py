@@ -185,11 +185,17 @@ class SourceDocument(BaseModelMixin, Base):
     sha256_hash = Column(String(64), nullable=False, index=True)
     storage_ref = Column(String(500), nullable=False)
     upload_status = Column(String(50), default="UPLOADED", nullable=False)
+    security_classification = Column(String(50), default="INTERNAL", nullable=False) # PUBLIC | INTERNAL | CONFIDENTIAL | RESTRICTED | PII
+    quarantine_status = Column(String(50), default="QUARANTINED", nullable=False) # QUARANTINED | VALIDATED | REJECTED
+    malware_scan_result = Column(String(50), default="PENDING_SCAN", nullable=False) # PENDING_SCAN | CLEAN | INFECTED | SCAN_FAILED
+    parent_document_id = Column(String(26), ForeignKey("source_documents.id"), nullable=True, index=True)
+    metadata_json = Column(JSONB_TYPE, nullable=True)
 
     submission = relationship("BidSubmission", back_populates="documents")
     submission_cover = relationship("SubmissionCover", back_populates="documents")
     extractions = relationship("DocumentExtraction", back_populates="source_document", cascade="all, delete-orphan")
     evidences = relationship("EvidenceRecord", back_populates="source_document")
+    parent_document = relationship("SourceDocument", remote_side="SourceDocument.id", backref="derivatives")
 
 
 class DocumentExtraction(BaseModelMixin, Base):
@@ -197,8 +203,11 @@ class DocumentExtraction(BaseModelMixin, Base):
 
     source_document_id = Column(String(26), ForeignKey("source_documents.id"), nullable=False, index=True)
     extraction_status = Column(String(50), default="COMPLETED", nullable=False)
+    extraction_method = Column(String(50), default="TEXT_PARSER", nullable=False) # TEXT_PARSER | OCR_PADDLE | OCR_TESSERACT | MOCK_OCR | AI_GATEWAY
     confidence_score = Column(Float, default=1.0, nullable=False)
     extractor_version = Column(String(50), default="v1.0", nullable=False)
+    sensitivity_level = Column(String(50), default="INTERNAL", nullable=False)
+    pii_detected_json = Column(JSONB_TYPE, nullable=True)
     metadata_json = Column(JSONB_TYPE, nullable=True)
 
     source_document = relationship("SourceDocument", back_populates="extractions")
@@ -211,6 +220,8 @@ class ExtractedField(BaseModelMixin, Base):
     document_extraction_id = Column(String(26), ForeignKey("document_extractions.id"), nullable=False, index=True)
     field_name = Column(String(100), nullable=False, index=True)
     field_value = Column(Text, nullable=True)
+    normalized_value = Column(Text, nullable=True)
+    source_text_snippet = Column(Text, nullable=True)
     field_type = Column(String(50), default="STRING", nullable=False)
     confidence = Column(Float, default=1.0, nullable=False)
 
@@ -292,6 +303,10 @@ class EvidenceRecord(BaseModelMixin, Base):
     verification_result_id = Column(String(26), ForeignKey("government_verification_results.id"), nullable=True, index=True)
     evidence_type = Column(String(100), nullable=False)
     confidence_score = Column(Float, default=1.0, nullable=False)
+    extraction_method = Column(String(50), default="TEXT_PARSER", nullable=True)
+    page_number = Column(Integer, nullable=True)
+    source_text_snippet = Column(Text, nullable=True)
+    bounding_box_json = Column(JSONB_TYPE, nullable=True)
     evidence_payload = Column(JSONB_TYPE, nullable=True)
 
     compliance_evaluation = relationship("ComplianceEvaluation", back_populates="evidences")

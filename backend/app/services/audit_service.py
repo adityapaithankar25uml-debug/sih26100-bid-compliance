@@ -31,13 +31,17 @@ class AuditService:
         action: str,
         resource_type: str,
         resource_id: str,
-        correlation_id: str,
         payload: Dict[str, Any],
+        correlation_id: Optional[str] = None,
     ) -> AuditEvent:
         """
         Logs an auditable domain action, canonicalizes the payload, calculates SHA-256,
         and appends a new block to the Tamper-Evident Audit Hash Chain.
         """
+        if not correlation_id:
+            from app.core.security import generate_ulid
+            correlation_id = generate_ulid()
+
         canonical_str = cls.canonicalize_payload(payload)
         payload_hash = cls.compute_sha256(canonical_str)
 
@@ -152,3 +156,11 @@ class AuditService:
             expected_previous_hash = block.current_hash
 
         return True, len(blocks), len(blocks), None, "Audit hash chain integrity verified successfully."
+
+    @classmethod
+    def verify_chain(cls, db: Session) -> Tuple[bool, int]:
+        is_valid, total, verified, _, _ = cls.verify_chain_integrity(db)
+        return is_valid, total
+
+
+audit_service = AuditService()

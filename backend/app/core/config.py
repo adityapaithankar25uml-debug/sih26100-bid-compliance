@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "sih26100-documents"
     MINIO_SECURE: bool = False
 
+    # Document AI Configuration Defaults (Configurable per environment/task)
+    MAX_UPLOAD_SIZE_MB: int = 25
+    CLASSIFICATION_CONFIDENCE_THRESHOLD: float = 0.70
+
     SEED_DEMO_DATA: bool = True
 
     @field_validator("CORS_ORIGINS", mode="before")

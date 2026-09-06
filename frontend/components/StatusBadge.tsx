@@ -11,6 +11,30 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   let label = normalized;
 
   switch (normalized) {
+    case 'AI_EXTRACTED':
+    case 'AI PROPOSAL':
+      style = 'bg-purple-50 text-purple-900 border-purple-300 font-medium';
+      label = 'AI EXTRACTED (ADVISORY)';
+      break;
+    case 'AI_GENERATED':
+      style = 'bg-violet-50 text-violet-900 border-violet-300 font-medium';
+      label = 'AI GENERATED (ADVISORY)';
+      break;
+    case 'DETERMINISTIC':
+    case 'DETERMINISTICALLY_EXTRACTED':
+      style = 'bg-cyan-50 text-cyan-900 border-cyan-300 font-medium';
+      label = 'DETERMINISTIC EXTRACTION';
+      break;
+    case 'GOVERNMENT_VERIFIED':
+      style = 'bg-emerald-100 text-emerald-900 border-emerald-400 font-bold';
+      label = 'GOVERNMENT VERIFIED';
+      break;
+    case 'MOCK':
+    case 'DEMO':
+    case 'MOCK / DEMO':
+      style = 'bg-orange-50 text-orange-900 border-orange-300 font-medium';
+      label = 'MOCK / DEMO';
+      break;
     case 'VERIFIED':
     case 'QUALIFIED':
     case 'ACTIVE':
