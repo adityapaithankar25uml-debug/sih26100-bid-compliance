@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 .env
 .env.*
@@ -12,3 +12,10 @@ build/
 .vscode/
 .DS_Store
 Thumbs.db
+.pytest_cache/
+coverage/
+*.sqlite
+*.sqlite3
+minio_data/
+postgres_data/
+
