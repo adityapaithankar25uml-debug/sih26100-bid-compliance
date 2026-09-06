@@ -36,17 +36,21 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Middleware: Request Correlation ID Propagation
+    # Middleware: Request Correlation ID & Idempotency Key Propagation
     @app.middleware("http")
-    async def add_correlation_id_header(request: Request, call_next):
+    async def add_correlation_and_idempotency_headers(request: Request, call_next):
         correlation_id = request.headers.get("X-Correlation-ID") or generate_ulid()
+        idempotency_key = request.headers.get("X-Idempotency-Key")
         request.state.correlation_id = correlation_id
+        request.state.idempotency_key = idempotency_key
         start_time = time.time()
 
         response = await call_next(request)
 
         process_time = (time.time() - start_time) * 1000
         response.headers["X-Correlation-ID"] = correlation_id
+        if idempotency_key:
+            response.headers["X-Idempotency-Key"] = idempotency_key
         response.headers["X-Process-Time-MS"] = f"{process_time:.2f}"
         return response
 
@@ -111,6 +115,21 @@ def create_application() -> FastAPI:
 
     # Include API Router
     app.include_router(api_router, prefix=settings.API_V1_STR)
+
+    @app.on_event("startup")
+    def startup_event():
+        if settings.SEED_DEMO_DATA:
+            try:
+                from app.db.session import SessionLocal, Base, engine
+                from app.db.seed import seed_database
+                Base.metadata.create_all(bind=engine)
+                db = SessionLocal()
+                try:
+                    seed_database(db)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Database startup initialization error: {e}")
 
     return app
 

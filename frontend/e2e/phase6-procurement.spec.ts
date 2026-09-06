@@ -37,7 +37,7 @@ test.describe('Phase 6 Procurement Dashboard & Complete Frontend E2E Suite', () 
 
   test('TEST 4: Tender Workspace & Requirement Specs', async ({ page }) => {
     await page.goto('http://localhost:3000/tenders/TEN_01');
-    await expect(page.getByText('Tender Requirements')).toBeVisible();
+    await expect(page.getByText('Tender Requirements', { exact: false })).toBeVisible();
     await expect(page.getByText('Version History')).toBeVisible();
   });
 
@@ -48,7 +48,7 @@ test.describe('Phase 6 Procurement Dashboard & Complete Frontend E2E Suite', () 
 
   test('TEST 6: Bid Workspace — Compliance Matrix Status Separation', async ({ page }) => {
     await page.goto('http://localhost:3000/bids/SUB_01');
-    await expect(page.getByText('Integrated Bid Verification Workspace')).toBeVisible();
+    await expect(page.getByText('Integrated Bid Verification Workspace', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: /Compliance Matrix/i }).click();
     await expect(page.getByText('Deterministic Compliance Matrix Evaluation')).toBeVisible();
   });
@@ -60,7 +60,7 @@ test.describe('Phase 6 Procurement Dashboard & Complete Frontend E2E Suite', () 
     await expect(page.getByText('GSTIN / GST Portal Registry')).toBeVisible();
     await expect(page.getByText('Udyam / MSME Certificate Registry')).toBeVisible();
     await expect(page.getByText('Ministry of Corporate Affairs (CIN/DIN)')).toBeVisible();
-    await expect(page.getByText('GeM / Central Procurement Debarment List')).toBeVisible();
+    await expect(page.getByText('GeM / Central Procurement Debarment List', { exact: false })).toBeVisible();
   });
 
   test('TEST 8: Evidence Explorer & 9 Quality Dimensions', async ({ page }) => {

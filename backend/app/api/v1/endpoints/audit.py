@@ -14,7 +14,7 @@ def list_audit_events(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Auditor", "SeniorReviewer", "SystemAdmin"])),
+    current_user: User = Depends(require_roles(["Auditor", "SeniorReviewer", "SystemAdmin", "ProcurementOfficer"])),
 ):
     return db.query(AuditEvent).order_by(AuditEvent.created_at.desc()).offset(skip).limit(limit).all()
 
@@ -22,7 +22,7 @@ def list_audit_events(
 @router.post("/verify-chain", response_model=AuditChainVerifyResponse, summary="Verify Tamper-Evident Audit Hash Chain Integrity")
 def verify_audit_chain(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Auditor", "SeniorReviewer", "SystemAdmin"])),
+    current_user: User = Depends(require_roles(["Auditor", "SeniorReviewer", "SystemAdmin", "ProcurementOfficer"])),
 ):
     is_valid, total, verified, corrupted_index, msg = AuditService.verify_chain_integrity(db)
     return AuditChainVerifyResponse(
