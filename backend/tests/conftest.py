@@ -11,7 +11,6 @@ SQLALCHEMY_TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE}"
 # Force file-backed SQLite database URL for pytest runner
 settings.DATABASE_URL = SQLALCHEMY_TEST_DATABASE_URL
 
-
 import app.db.session as db_session
 from app.db.session import Base, get_db
 from app.main import app
@@ -23,6 +22,8 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
 
 # Override main application engine and SessionLocal for test suite
 db_session.engine = engine
@@ -40,7 +41,18 @@ def db():
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
+        cleanup_session = TestingSessionLocal()
+        try:
+            for table in reversed(Base.metadata.sorted_tables):
+                cleanup_session.execute(table.delete())
+            cleanup_session.commit()
+        except Exception:
+            cleanup_session.rollback()
+        finally:
+            cleanup_session.close()
+
+
+
 
 
 @pytest.fixture(scope="function")
