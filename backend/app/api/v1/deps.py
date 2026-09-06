@@ -29,10 +29,6 @@ def get_current_user(
     db: Session = Depends(get_db), token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
     if not token:
-        # Development / demo fallback: return active ProcurementOfficer if token missing in demo mode
-        user = db.query(User).filter(User.role == "ProcurementOfficer").first()
-        if user:
-            return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials missing.",

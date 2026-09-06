@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, auth, tenders, bidders, submissions, documents, audit, document_intelligence, verification_compliance
+from app.api.v1.endpoints import health, auth, tenders, bidders, submissions, documents, audit, document_intelligence, verification_compliance, phase5
 
 api_router = APIRouter()
 
@@ -12,3 +12,5 @@ api_router.include_router(documents.router, prefix="/documents", tags=["Source D
 api_router.include_router(audit.router, prefix="/audit", tags=["Tamper-Evident Audit Chain"])
 api_router.include_router(document_intelligence.router, tags=["Document Intelligence & AI Pipeline"])
 api_router.include_router(verification_compliance.router, tags=["Government Verification & Compliance Engine"])
+api_router.include_router(phase5.router, tags=["Evidence, Risk & Human Review Workspace"])
+

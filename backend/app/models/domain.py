@@ -334,9 +334,14 @@ class ComplianceEvaluation(BaseModelMixin, Base):
 class EvidenceRecord(BaseModelMixin, Base):
     __tablename__ = "evidence_records"
 
-    compliance_evaluation_id = Column(String(26), ForeignKey("compliance_evaluations.id"), nullable=False, index=True)
+    compliance_evaluation_id = Column(String(26), ForeignKey("compliance_evaluations.id"), nullable=True, index=True)
+    bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=True, index=True)
+    requirement_id = Column(String(26), ForeignKey("tender_requirements.id"), nullable=True, index=True)
+    rule_id = Column(String(26), ForeignKey("compliance_rules.id"), nullable=True, index=True)
+    policy_version_id = Column(String(26), ForeignKey("policy_versions.id"), nullable=True, index=True)
     source_document_id = Column(String(26), ForeignKey("source_documents.id"), nullable=True, index=True)
     verification_result_id = Column(String(26), ForeignKey("government_verification_results.id"), nullable=True, index=True)
+    verification_record_id = Column(String(26), ForeignKey("government_verification_records.id"), nullable=True, index=True)
     evidence_type = Column(String(100), nullable=False)
     confidence_score = Column(Float, default=1.0, nullable=False)
     extraction_method = Column(String(50), default="TEXT_PARSER", nullable=True)
@@ -344,6 +349,10 @@ class EvidenceRecord(BaseModelMixin, Base):
     source_text_snippet = Column(Text, nullable=True)
     bounding_box_json = Column(JSONB_TYPE, nullable=True)
     evidence_payload = Column(JSONB_TYPE, nullable=True)
+    evidence_quality_json = Column(JSONB_TYPE, nullable=True)
+    status = Column(String(50), default="VALID", nullable=False)
+    security_classification = Column(String(50), default="INTERNAL", nullable=False)
+    provenance_metadata_json = Column(JSONB_TYPE, nullable=True)
 
     compliance_evaluation = relationship("ComplianceEvaluation", back_populates="evidences")
     source_document = relationship("SourceDocument", back_populates="evidences")
@@ -356,6 +365,7 @@ class RiskAssessmentProfile(BaseModelMixin, Base):
     bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=False, index=True)
     overall_risk_level = Column(String(50), default="LOW", nullable=False) # LOW | MEDIUM | HIGH | CRITICAL
     risk_score = Column(Float, default=0.0, nullable=False)
+    profile_version = Column(String(50), default="1.0.0", nullable=False)
     calculated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     submission = relationship("BidSubmission", back_populates="risk_profiles")
@@ -380,8 +390,14 @@ class OfficerDecision(BaseModelMixin, Base):
 
     bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=False, index=True)
     reviewer_id = Column(String(26), ForeignKey("users.id"), nullable=False, index=True)
-    decision = Column(String(50), nullable=False) # QUALIFIED | DISQUALIFIED | REQUIRES_CLARIFICATION
+    tender_id = Column(String(26), ForeignKey("tenders.id"), nullable=True, index=True)
+    tender_version_id = Column(String(26), ForeignKey("tender_versions.id"), nullable=True, index=True)
+    bidder_id = Column(String(26), ForeignKey("bidders.id"), nullable=True, index=True)
+    decision = Column(String(50), nullable=False) # QUALIFIED | DISQUALIFIED | REQUIRES_CLARIFICATION | EVIDENCE_REQUESTED
     rationale = Column(Text, nullable=False)
+    evaluation_snapshot_id = Column(String(26), nullable=True, index=True)
+    risk_profile_id = Column(String(26), ForeignKey("risk_assessment_profiles.id"), nullable=True, index=True)
+    audit_event_id = Column(String(26), ForeignKey("audit_events.id"), nullable=True, index=True)
     decision_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     submission = relationship("BidSubmission", back_populates="officer_decisions")
@@ -393,12 +409,31 @@ class ManualOverride(BaseModelMixin, Base):
     __tablename__ = "manual_overrides"
 
     officer_decision_id = Column(String(26), ForeignKey("officer_decisions.id"), nullable=False, index=True)
+    bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=True, index=True)
     requirement_id = Column(String(26), ForeignKey("tender_requirements.id"), nullable=False, index=True)
+    rule_id = Column(String(26), ForeignKey("compliance_rules.id"), nullable=True, index=True)
     previous_status = Column(String(50), nullable=False)
     new_status = Column(String(50), nullable=False)
+    override_reason_code = Column(String(100), nullable=True, default="OFFICER_REVIEW")
     override_reason = Column(Text, nullable=False)
+    supporting_evidence_refs_json = Column(JSONB_TYPE, nullable=True)
+    requires_four_eyes = Column(Boolean, default=False, nullable=False)
+    approved_by_officer_id = Column(String(26), ForeignKey("users.id"), nullable=True, index=True)
+    four_eyes_status = Column(String(50), default="APPROVED", nullable=False)
 
     officer_decision = relationship("OfficerDecision", back_populates="overrides")
+
+
+class EvaluationSnapshot(BaseModelMixin, Base):
+    __tablename__ = "evaluation_snapshots"
+
+    bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=False, index=True)
+    tender_version_id = Column(String(26), ForeignKey("tender_versions.id"), nullable=True, index=True)
+    policy_version_id = Column(String(26), ForeignKey("policy_versions.id"), nullable=True, index=True)
+    evaluation_id = Column(String(26), ForeignKey("compliance_evaluations.id"), nullable=True, index=True)
+    snapshot_data_json = Column(JSONB_TYPE, nullable=False)
+    snapshot_hash = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
 
 class AuditEvent(BaseModelMixin, Base):
@@ -425,12 +460,8 @@ class AuditHashChainBlock(BaseModelMixin, Base):
     current_hash = Column(String(64), nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
-    audit_event = relationship("AuditEvent", back_populates="blocks")
+    audit_event = relationship("AuditHashChainBlock", remote_side="AuditHashChainBlock.id", backref="chain_block") if False else relationship("AuditEvent", back_populates="blocks")
 
-
-# ============================================================
-# PHASE 4: GOVERNMENT VERIFICATION & COMPLIANCE ENGINE MODELS
-# ============================================================
 
 class GovernmentSourceRegistry(BaseModelMixin, Base):
     __tablename__ = "government_source_registries"
@@ -476,8 +507,6 @@ class GovernmentVerificationRecord(BaseModelMixin, Base):
     facts = relationship("ComplianceFact", back_populates="verification_record")
 
 
-
-
 class RequirementRuleMapping(BaseModelMixin, Base):
     __tablename__ = "requirement_rule_mappings"
 
@@ -503,8 +532,6 @@ class ComplianceFact(BaseModelMixin, Base):
     verification_record = relationship("GovernmentVerificationRecord", back_populates="facts")
 
 
-
-
 class ComplianceRuleResult(BaseModelMixin, Base):
     __tablename__ = "compliance_rule_results"
 
@@ -525,14 +552,25 @@ class HumanReviewTask(BaseModelMixin, Base):
     __tablename__ = "human_review_tasks"
 
     bid_submission_id = Column(String(26), ForeignKey("bid_submissions.id"), nullable=False, index=True)
+    tender_id = Column(String(26), ForeignKey("tenders.id"), nullable=True, index=True)
+    tender_requirement_id = Column(String(26), ForeignKey("tender_requirements.id"), nullable=True, index=True)
+    bidder_id = Column(String(26), ForeignKey("bidders.id"), nullable=True, index=True)
+    policy_version_id = Column(String(26), ForeignKey("policy_versions.id"), nullable=True, index=True)
     document_id = Column(String(26), ForeignKey("source_documents.id"), nullable=True, index=True)
     verification_record_id = Column(String(26), ForeignKey("government_verification_records.id"), nullable=True, index=True)
     evaluation_id = Column(String(26), ForeignKey("compliance_evaluations.id"), nullable=True, index=True)
+    review_code = Column(String(100), nullable=True, index=True)
     review_reason = Column(String(255), nullable=False)
-    severity = Column(String(50), default="MEDIUM", nullable=False)  # HIGH, MEDIUM, LOW
-    status = Column(String(50), default="PENDING", nullable=False)  # PENDING, IN_REVIEW, RESOLVED, REJECTED
+    severity = Column(String(50), default="MEDIUM", nullable=False)  # HIGH, MEDIUM, LOW, CRITICAL
+    priority = Column(String(50), default="MEDIUM", nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
+    status = Column(String(50), default="PENDING", nullable=False)  # PENDING, IN_REVIEW, RESOLVED, REJECTED, ESCALATED
     assigned_officer_id = Column(String(26), nullable=True, index=True)
+    suggested_action = Column(Text, nullable=True)
+    resolution_summary = Column(Text, nullable=True)
+    evidence_refs_json = Column(JSONB_TYPE, nullable=True)
+    review_history_json = Column(JSONB_TYPE, nullable=True)
     decision = Column(String(50), nullable=True)
     comments = Column(Text, nullable=True)
     decided_at = Column(DateTime, nullable=True)
+
 

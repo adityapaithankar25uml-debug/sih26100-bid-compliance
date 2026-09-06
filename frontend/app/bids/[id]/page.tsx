@@ -2,29 +2,75 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { FolderCheck, ArrowLeft, Shield, CheckCircle, FileCheck } from 'lucide-react';
-import { fetchSubmissions } from '../../../lib/api';
-import { BidSubmission } from '../../../types';
+import { ArrowLeft, Shield, FileCheck, HelpCircle, GitCommit, AlertTriangle, UserCheck } from 'lucide-react';
+import {
+  fetchSubmissions,
+  fetchBidComplianceExplanation,
+  fetchBidEvidenceTrace,
+  fetchBidRiskAssessment,
+  fetchHumanReviewTasks,
+  resolveHumanReviewTask,
+  recordOfficerDecision
+} from '../../../lib/api';
+import {
+  BidSubmission,
+  ComplianceExplanationResponse,
+  EvidenceTraceGraph,
+  RiskAssessmentResponse,
+  HumanReviewTask
+} from '../../../types';
 import { StatusBadge } from '../../../components/StatusBadge';
+import { WhyExplanationPanel } from '../../../components/WhyExplanationPanel';
+import { EvidenceLineageGraph } from '../../../components/EvidenceLineageGraph';
+import { RiskAssessmentPanel } from '../../../components/RiskAssessmentPanel';
+import { HumanReviewWorkspace } from '../../../components/HumanReviewWorkspace';
+import { OfficerDecisionDialog } from '../../../components/OfficerDecisionDialog';
 
 export default function BidDetailPage() {
   const params = useParams();
   const subId = params?.id as string;
   const [submission, setSubmission] = useState<BidSubmission | null>(null);
+  const [explanation, setExplanation] = useState<ComplianceExplanationResponse | null>(null);
+  const [evidenceTrace, setEvidenceTrace] = useState<EvidenceTraceGraph | null>(null);
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentResponse | null>(null);
+  const [reviewTasks, setReviewTasks] = useState<HumanReviewTask[]>([]);
+  const [activeTab, setActiveTab] = useState<'explanation' | 'lineage' | 'risk' | 'review' | 'decision'>('explanation');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (subId) {
-      fetchSubmissions().then((list) => {
-        const found = list.find((s) => s.id === subId);
-        setSubmission(found || null);
+      Promise.all([
+        fetchSubmissions().then((list) => list.find((s) => s.id === subId) || null),
+        fetchBidComplianceExplanation(subId),
+        fetchBidEvidenceTrace(subId),
+        fetchBidRiskAssessment(subId),
+        fetchHumanReviewTasks()
+      ]).then(([sub, exp, trace, risk, tasks]) => {
+        setSubmission(sub);
+        setExplanation(exp);
+        setEvidenceTrace(trace);
+        setRiskAssessment(risk);
+        setReviewTasks(tasks.filter((t) => t.bid_submission_id === subId));
         setLoading(false);
       });
     }
   }, [subId]);
 
+  const handleResolveTask = async (taskId: string, decision: string, summary: string) => {
+    await resolveHumanReviewTask(taskId, decision, summary);
+    const updatedTasks = await fetchHumanReviewTasks();
+    setReviewTasks(updatedTasks.filter((t) => t.bid_submission_id === subId));
+  };
+
+  const handleOfficerDecision = async (decision: string, rationale: string) => {
+    await recordOfficerDecision(subId, decision, rationale);
+    if (submission) {
+      setSubmission({ ...submission, status: decision });
+    }
+  };
+
   if (loading) {
-    return <div className="p-8 text-center text-xs text-slate-400">Loading bid submission...</div>;
+    return <div className="p-8 text-center text-xs text-slate-400">Loading Phase 5 Evidence & Review Workspace...</div>;
   }
 
   if (!submission) {
@@ -41,7 +87,7 @@ export default function BidDetailPage() {
         <ArrowLeft className="w-3.5 h-3.5" /> Back to Submissions Registry
       </Link>
 
-      {/* Proposal Summary Card */}
+      {/* Proposal Summary Header */}
       <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-start justify-between">
           <div>
@@ -49,7 +95,7 @@ export default function BidDetailPage() {
               {submission.submission_reference}
             </span>
             <h2 className="text-xl font-bold text-slate-900 mt-2">
-              Bid Submission Review Workspace
+              Phase 5 Evidence, Risk & Human Officer Workspace
             </h2>
           </div>
           <StatusBadge status={submission.status} />
@@ -77,43 +123,71 @@ export default function BidDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Document Covers Card */}
-        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
-            <FileCheck className="w-4 h-4 text-gov-blue" />
-            Registered Document Covers
-          </h3>
-
-          <div className="p-4 bg-slate-50 rounded border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-slate-900">TECHNICAL & EXPERIMENTAL COVER</span>
-              <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded">REGISTERED</span>
-            </div>
-            <p className="text-xs text-slate-600">
-              Contains technical proposals, experience certificates, and ISO quality documentation.
-            </p>
-          </div>
-        </div>
-
-        {/* Verification Status Card */}
-        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Shield className="w-4 h-4 text-emerald-600" />
-            Compliance Status Framework
-          </h3>
-
-          <div className="p-4 bg-slate-50 rounded border border-slate-200 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-800">Evaluation Phase:</span>
-              <span className="font-mono text-gov-blue font-bold">FOUNDATION PERSISTENCE</span>
-            </div>
-            <p className="text-slate-600 leading-relaxed">
-              In Phase 2, submission persistence and domain relationships are established. Deterministic compliance rule evaluation runs in later pipeline phases.
-            </p>
-          </div>
-        </div>
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold">
+        <button
+          onClick={() => setActiveTab('explanation')}
+          className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            activeTab === 'explanation' ? 'border-gov-blue text-gov-blue font-bold' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          "Why?" Explanation
+        </button>
+        <button
+          onClick={() => setActiveTab('lineage')}
+          className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            activeTab === 'lineage' ? 'border-gov-blue text-gov-blue font-bold' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <GitCommit className="w-3.5 h-3.5" />
+          Evidence Lineage
+        </button>
+        <button
+          onClick={() => setActiveTab('risk')}
+          className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            activeTab === 'risk' ? 'border-gov-blue text-gov-blue font-bold' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Advisory Risk Engine
+        </button>
+        <button
+          onClick={() => setActiveTab('review')}
+          className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            activeTab === 'review' ? 'border-gov-blue text-gov-blue font-bold' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <UserCheck className="w-3.5 h-3.5" />
+          Human Review Tasks ({reviewTasks.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('decision')}
+          className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            activeTab === 'decision' ? 'border-gov-blue text-gov-blue font-bold' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Shield className="w-3.5 h-3.5" />
+          Officer Decision & Override
+        </button>
       </div>
+
+      {/* Tab Panels */}
+      {activeTab === 'explanation' && <WhyExplanationPanel explanation={explanation} />}
+      {activeTab === 'lineage' && <EvidenceLineageGraph graph={evidenceTrace} />}
+      {activeTab === 'risk' && <RiskAssessmentPanel riskAssessment={riskAssessment} />}
+      {activeTab === 'review' && (
+        <HumanReviewWorkspace
+          tasks={reviewTasks}
+          onResolveTask={handleResolveTask}
+        />
+      )}
+      {activeTab === 'decision' && (
+        <OfficerDecisionDialog
+          submissionId={subId}
+          onSubmitDecision={handleOfficerDecision}
+        />
+      )}
     </div>
   );
 }

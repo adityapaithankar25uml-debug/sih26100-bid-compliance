@@ -1,4 +1,4 @@
-import { Tender, Bidder, BidSubmission, AuditEvent, AuditChainVerify, User } from '../types';
+import { Tender, Bidder, BidSubmission, AuditEvent, AuditChainVerify, User, ComplianceExplanationResponse, EvidenceTraceGraph, RiskAssessmentResponse, HumanReviewTask, OfficerDecisionResponse, ManualOverrideResponse } from '../types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -157,6 +157,108 @@ export async function fetchTenderRequirementCandidates(tenderId: string): Promis
 export async function fetchBidInconsistencyCandidates(submissionId: string): Promise<any> {
   try {
     const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/inconsistency-candidates`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+// ============================================================
+// PHASE 5 API FUNCTIONS
+// ============================================================
+
+export async function fetchBidComplianceExplanation(submissionId: string): Promise<ComplianceExplanationResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/explanation`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchBidEvidenceTrace(submissionId: string): Promise<EvidenceTraceGraph | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/evidence-trace`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchBidRiskAssessment(submissionId: string): Promise<RiskAssessmentResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/risk-assessment`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchHumanReviewTasks(statusFilter?: string): Promise<HumanReviewTask[]> {
+  try {
+    const url = statusFilter ? `${API_BASE_URL}/human-reviews?status_filter=${statusFilter}` : `${API_BASE_URL}/human-reviews`;
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function resolveHumanReviewTask(taskId: string, decision: string, summary: string): Promise<HumanReviewTask | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/human-reviews/${taskId}/resolve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision, resolution_summary: summary }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function recordOfficerDecision(
+  submissionId: string,
+  decision: string,
+  rationale: string,
+  overrides?: any[]
+): Promise<OfficerDecisionResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/officer-decisions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision, rationale, overrides }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchBidManualOverrides(submissionId: string): Promise<ManualOverrideResponse[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/bids/${submissionId}/manual-overrides`, { headers: getAuthHeaders() });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function approveManualOverride(overrideId: string, approved: boolean, comments?: string): Promise<ManualOverrideResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/manual-overrides/${overrideId}/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ approved, comments }),
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
